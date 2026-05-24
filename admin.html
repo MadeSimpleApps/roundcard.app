@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RoundCard Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --black: #0D0D0F; --red: #E8001D; --gold: #C9A84C;
+    --gray: #1A1A1E; --mid: #2A2A2F; --muted: #6B6B72;
+    --text: #EBEBED; --sub: #9494A0; --bone: #F5F0E8;
+    --blue: #5FA8E8; --green: #22C55E;
+  }
+  body { background: var(--black); color: var(--text); font-family: system-ui, sans-serif; min-height: 100vh; }
+  header { background: var(--gray); border-bottom: 1px solid var(--mid); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+  .logo { font-size: 22px; font-weight: 900; letter-spacing: 2px; color: var(--bone); }
+  .logo span { color: var(--red); }
+  .badge { background: var(--red); color: white; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+  main { max-width: 960px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; }
+  .card { background: var(--gray); border: 0.5px solid var(--mid); border-radius: 14px; overflow: hidden; }
+  .card-header { padding: 16px 20px; border-bottom: 0.5px solid var(--mid); display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .card-title { font-size: 15px; font-weight: 700; color: var(--bone); }
+  .card-sub { font-size: 12px; color: var(--sub); margin-top: 4px; }
+  .card-body { padding: 20px; }
+  .btn { border: none; border-radius: 8px; padding: 10px 18px; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: opacity 0.15s; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-red { background: var(--red); color: white; }
+  .btn-gold { background: var(--gold); color: var(--black); }
+  .btn-mid { background: var(--mid); color: var(--text); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .msg { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
+  .msg-success { background: rgba(34,197,94,0.1); border: 0.5px solid rgba(34,197,94,0.3); color: var(--green); }
+  .msg-error   { background: rgba(232,0,29,0.1); border: 0.5px solid rgba(232,0,29,0.3); color: var(--red); }
+  .msg-info    { background: rgba(95,168,232,0.1); border: 0.5px solid rgba(95,168,232,0.3); color: var(--blue); }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .event-block { background: var(--mid); border-radius: 12px; margin-bottom: 12px; overflow: hidden; border: 0.5px solid #3A3A3F; }
+  .event-head { background: #0f0a00; padding: 12px 16px; display: flex; align-items: flex-start; justify-content: space-between; }
+  .event-name { font-size: 15px; font-weight: 700; color: var(--bone); }
+  .event-meta { font-size: 11px; color: var(--sub); margin-top: 3px; }
+  .fight-item { display: flex; align-items: center; padding: 10px 16px; border-bottom: 0.5px solid #2A2A2F; gap: 12px; }
+  .fight-item:last-of-type { border-bottom: none; }
+  .fight-names { font-size: 14px; font-weight: 600; color: var(--bone); flex: 1; }
+  .fight-sub { font-size: 11px; color: var(--sub); margin-top: 2px; }
+  .billing-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+  .billing-main { background: rgba(232,0,29,0.15); color: var(--red); border: 0.5px solid rgba(232,0,29,0.3); }
+  .billing-other { background: rgba(201,168,76,0.15); color: var(--gold); border: 0.5px solid rgba(201,168,76,0.3); }
+  .import-footer { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-top: 0.5px solid #2A2A2F; }
+  .import-count { font-size: 12px; color: var(--sub); }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .form-grid.cols3 { grid-template-columns: 1fr 1fr 1fr; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 11px; font-weight: 600; color: var(--sub); letter-spacing: 0.8px; text-transform: uppercase; }
+  .field input, .field select { background: var(--mid); border: 0.5px solid #3A3A3F; border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 14px; outline: none; width: 100%; }
+  .field input:focus, .field select:focus { border-color: var(--red); }
+  .section-lbl { font-size: 12px; font-weight: 700; color: var(--sub); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
+  .fights-table { display: flex; flex-direction: column; gap: 8px; }
+  .manage-row { background: var(--mid); border-radius: 10px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .manage-name { font-weight: 700; font-size: 14px; color: var(--bone); }
+  .manage-meta { font-size: 11px; color: var(--sub); margin-top: 2px; }
+  .status-pill { font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 20px; white-space: nowrap; }
+  .s-live { background: rgba(232,0,29,0.2); color: var(--red); border: 0.5px solid rgba(232,0,29,0.4); }
+  .s-upcoming { background: rgba(201,168,76,0.15); color: var(--gold); border: 0.5px solid rgba(201,168,76,0.3); }
+  .s-completed { background: rgba(148,148,160,0.15); color: var(--sub); border: 0.5px solid rgba(148,148,160,0.3); }
+  .act-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .empty { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+  .fighter-row { display: flex; align-items: center; gap: 12px; background: var(--mid); border-radius: 10px; padding: 10px 14px; }
+  .fighter-avatar { width: 44px; height: 44px; border-radius: 22px; overflow: hidden; background: var(--black); border: 2px solid var(--mid); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .fighter-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .fighter-avatar-initials { font-size: 16px; font-weight: 900; color: var(--sub); }
+  .fighter-info { flex: 1; }
+  .fighter-name { font-weight: 700; font-size: 14px; color: var(--bone); }
+  .fighter-record { font-size: 11px; color: var(--sub); margin-top: 2px; }
+  .photo-status-ok  { font-size: 10px; color: var(--green); }
+  .photo-status-no  { font-size: 10px; color: var(--muted); }
+</style>
+</head>
+
+<style>
+#admin-lock {
+  position: fixed; inset: 0; background: #0D0D0F; z-index: 9999;
+  display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 24px;
+}
+#admin-lock .lock-logo { font-size: 28px; font-weight: 900; letter-spacing: 2px; color: #F5F0E8; }
+#admin-lock .lock-logo span { color: #E8001D; }
+#admin-lock input {
+  background: #1A1A1E; border: 0.5px solid #3A3A3F; border-radius: 10px;
+  padding: 14px 20px; color: #F5F0E8; font-size: 16px; outline: none;
+  width: 280px; text-align: center; letter-spacing: 2px;
+}
+#admin-lock input:focus { border-color: #E8001D; }
+#admin-lock button {
+  background: #E8001D; color: white; border: none; border-radius: 10px;
+  padding: 14px 40px; font-size: 14px; font-weight: 700; cursor: pointer;
+  letter-spacing: 1px; width: 280px;
+}
+#admin-lock .lock-error { color: #E8001D; font-size: 13px; display: none; }
+</style>
+
+<div id="admin-lock">
+  <div class="lock-logo">ROUND<span>CARD</span> ADMIN</div>
+  <input type="password" id="admin-pw" placeholder="Enter password" onkeydown="if(event.key==='Enter')checkPw()"/>
+  <button onclick="checkPw()">ENTER →</button>
+  <div class="lock-error" id="lock-error">Incorrect password</div>
+</div>
+
+<script>
+function checkPw() {
+  const pw = document.getElementById('admin-pw').value;
+  if (pw === 'WayneandMatt') {
+    document.getElementById('admin-lock').style.display = 'none';
+    sessionStorage.setItem('rc_admin', '1');
+  } else {
+    document.getElementById('lock-error').style.display = 'block';
+    document.getElementById('admin-pw').value = '';
+  }
+}
+// Auto-unlock if already authenticated this session
+if (sessionStorage.getItem('rc_admin') === '1') {
+  document.addEventListener('DOMContentLoaded', function() {
+    var lock = document.getElementById('admin-lock');
+    if (lock) lock.style.display = 'none';
+  });
+}
+</script>
+
+<body>
+<header>
+  <div class="logo">ROUND<span>CARD</span></div>
+  <div class="badge">ADMIN PANEL</div>
+</header>
+<main>
+
+  <!-- SYNC -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">🔄 Sync This Week's Fights</div>
+        <div class="card-sub">Pulls full fight cards from Boxing Data API (next 7 days)</div>
+      </div>
+      <button class="btn btn-gold" id="syncBtn" onclick="syncFights()">SYNC NOW</button>
+    </div>
+    <div class="card-body">
+      <div id="syncMsg"></div>
+      <div id="syncResults"></div>
+    </div>
+  </div>
+
+  <!-- FIGHTER DATA -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">📸 Fighter Photos & Records</div>
+        <div class="card-sub">Fetches Wikipedia photos and Boxing Data API records for all fighters</div>
+      </div>
+      <div class="act-row">
+        <button class="btn btn-gold" id="photosBtn" onclick="fetchFighterData()">FETCH ALL</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div id="photosMsg"></div>
+      <div id="fightersList" style="display:flex;flex-direction:column;gap:8px;margin-top:8px;"></div>
+    </div>
+  </div>
+
+
+  <!-- MANAGE FIGHTER PHOTOS -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">🥊 Manage Fighter Photos</div>
+        <div class="card-sub">Manually paste an image URL for any fighter</div>
+      </div>
+      <button class="btn btn-mid btn-sm" onclick="loadFighterPhotos()">↺ REFRESH</button>
+    </div>
+    <div class="card-body">
+      <div id="manualFightersList"><div class="empty">Loading...</div></div>
+    </div>
+  </div>
+
+  <!-- ADD MANUALLY -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">➕ Add Fight Manually</div></div>
+    <div class="card-body">
+      <div class="section-lbl">Fighter A (Red Corner)</div>
+      <div class="form-grid">
+        <div class="field"><label>Name</label><input id="fa-name" placeholder="e.g. Tyson Fury" /></div>
+        <div class="field"><label>Record</label><input id="fa-record" placeholder="e.g. 34-0-1" /></div>
+      </div>
+      <div class="section-lbl">Fighter B (Blue Corner)</div>
+      <div class="form-grid">
+        <div class="field"><label>Name</label><input id="fb-name" placeholder="e.g. Oleksandr Usyk" /></div>
+        <div class="field"><label>Record</label><input id="fb-record" placeholder="e.g. 22-0" /></div>
+      </div>
+      <div class="section-lbl">Fight Details</div>
+      <div class="form-grid cols3">
+        <div class="field"><label>Weight Class</label>
+          <select id="wc">
+            <option>Heavyweight</option><option>Cruiserweight</option><option>Light Heavyweight</option>
+            <option>Super Middleweight</option><option>Middleweight</option><option>Super Welterweight</option>
+            <option>Welterweight</option><option>Super Lightweight</option><option>Lightweight</option>
+            <option>Super Featherweight</option><option>Featherweight</option><option>Super Bantamweight</option>
+            <option>Bantamweight</option><option>Super Flyweight</option><option>Flyweight</option>
+            <option>Light Flyweight</option><option>Strawweight</option>
+          </select>
+        </div>
+        <div class="field"><label>Rounds</label>
+          <select id="rds"><option value="12">12</option><option value="10">10</option><option value="8">8</option><option value="6">6</option><option value="4">4</option></select>
+        </div>
+        <div class="field"><label>Status</label>
+          <select id="st"><option value="upcoming">Upcoming</option><option value="live">Live</option><option value="completed">Completed</option></select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label>Event Name</label><input id="ev-name" placeholder="e.g. Fight Night: Fury vs Usyk II" /></div>
+        <div class="field"><label>Venue</label><input id="venue" placeholder="e.g. Madison Square Garden" /></div>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label>Fight Date & Time</label><input id="fdate" type="datetime-local" /></div>
+      </div>
+      <div id="addMsg"></div>
+      <button class="btn btn-red" onclick="addFight()" style="width:100%;padding:13px;justify-content:center;margin-top:8px;">ADD FIGHT →</button>
+    </div>
+  </div>
+
+
+  <!-- AUTO FETCH RESULTS -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">🏆 Auto-Fetch Fight Results</div>
+        <div class="card-sub">Pulls winner and method from Boxing Data API for fights in the last 7 days</div>
+      </div>
+      <button class="btn btn-gold" id="resultsBtn" onclick="fetchResults()">FETCH RESULTS</button>
+    </div>
+    <div class="card-body">
+      <div id="resultsMsg"></div>
+    </div>
+  </div>
+
+  <!-- MANAGE FIGHTS -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">🥊 Manage Fights</div>
+        <div class="card-sub">Status updates automatically from fight date/time. Use override only if needed.</div>
+      </div>
+      <button class="btn btn-mid btn-sm" onclick="loadFights()">↺ REFRESH</button>
+    </div>
+    <div class="card-body">
+      <div id="fightsList"><div class="empty">Loading...</div></div>
+    </div>
+  </div>
+
+</main>
+<script>
+const SUPABASE_URL = 'https://aeiosubhurnlwsaqrwwj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFlaW9zdWJodXJubHdzYXFyd3dqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNzE3MzAsImV4cCI6MjA5NDk0NzczMH0.N2aN4NOzRpiCtEYhiagyPHjac2Jyj4aDskQLxLz_7cM';
+const RAPIDAPI_KEY = 'edbc52525emsh1c6ae957149a61ap1fe86ejsncf2e57a79043';
+const API_HOST    = 'boxing-data-api.p.rapidapi.com';
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let storedEvents = [];
+
+const WEIGHT_MAP = {
+  'heavyweight':'Heavyweight','cruiserweight':'Cruiserweight','light heavyweight':'Light Heavyweight',
+  'super middleweight':'Super Middleweight','middleweight':'Middleweight','super welterweight':'Super Welterweight',
+  'welterweight':'Welterweight','super lightweight':'Super Lightweight','lightweight':'Lightweight',
+  'super featherweight':'Super Featherweight','featherweight':'Featherweight','super bantamweight':'Super Bantamweight',
+  'bantamweight':'Bantamweight','super flyweight':'Super Flyweight','flyweight':'Flyweight',
+  'light flyweight':'Light Flyweight','strawweight':'Strawweight'
+};
+
+function normaliseWeight(divObj) {
+  if (!divObj) return 'Heavyweight';
+  const raw = (typeof divObj === 'string' ? divObj : divObj.name ?? '').toLowerCase();
+  for (const [k,v] of Object.entries(WEIGHT_MAP)) { if (raw.includes(k)) return v; }
+  return 'Heavyweight';
+}
+
+function fmtDate(str) {
+  if (!str) return 'TBA';
+  return new Date(str).toLocaleDateString('en-GB', {weekday:'short',day:'numeric',month:'long',year:'numeric'});
+}
+
+// ── SYNC ──────────────────────────────────────────────────────
+async function syncFights() {
+  const btn = document.getElementById('syncBtn');
+  const msg = document.getElementById('syncMsg');
+  const res = document.getElementById('syncResults');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Fetching...';
+  msg.innerHTML = '<div class="msg msg-info">Contacting Boxing Data API...</div>';
+  res.innerHTML = '';
+  storedEvents = [];
+
+  try {
+    const r = await fetch(`https://${API_HOST}/v2/fights/schedule/?days=7&page_size=50&page_num=1&date_sort=ASC`, {
+      headers: { 'x-rapidapi-key': RAPIDAPI_KEY, 'x-rapidapi-host': API_HOST }
+    });
+    if (!r.ok) throw new Error(`API error ${r.status}`);
+    const json = await r.json();
+    const fights = json.data ?? [];
+    if (!fights.length) { msg.innerHTML = '<div class="msg msg-error">No fights found for this week.</div>'; return; }
+
+    const evMap = new Map();
+    for (const fight of fights) {
+      const evId    = fight.event?.id ?? fight.id;
+      const evTitle = fight.event?.title ?? fight.title ?? 'Unknown Event';
+      if (!evMap.has(evId)) {
+        evMap.set(evId, { id: evId, title: evTitle, date: fight.event?.date ?? fight.date, venue: fight.venue ?? fight.location ?? null, fights: [] });
+      }
+      evMap.get(evId).fights.push(fight);
+    }
+
+    storedEvents = Array.from(evMap.values());
+    msg.innerHTML = `<div class="msg msg-success">Found ${storedEvents.length} event(s) with ${fights.length} fights this week.</div>`;
+
+    storedEvents.forEach((ev, ei) => {
+      const block = document.createElement('div');
+      block.className = 'event-block';
+      const dateStr = ev.date ? new Date(ev.date).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'long'}) : 'TBA';
+      const fightsHtml = ev.fights.map((f, fi) => {
+        const f1 = f.fighters?.fighter_1?.full_name ?? f.fighters?.fighter_1?.name ?? '?';
+        const f2 = f.fighters?.fighter_2?.full_name ?? f.fighters?.fighter_2?.name ?? '?';
+        const div = f.division?.name ?? '';
+        const rds = f.scheduled_rounds ? '• ' + f.scheduled_rounds + ' Rds' : '';
+        const billing = f.card_billing ?? (fi === 0 ? 'Main Event' : 'Undercard');
+        const isMain = fi === 0;
+        return `<div class="fight-item">
+          <input type="checkbox" class="ev-fight-${ei}" id="f-${ei}-${fi}" checked style="accent-color:var(--red);width:15px;height:15px;cursor:pointer;flex-shrink:0;">
+          <div style="flex:1;"><div class="fight-names">${f1} vs ${f2}</div><div class="fight-sub">${div} ${rds}</div></div>
+          <span class="billing-badge ${isMain ? 'billing-main' : 'billing-other'}">${billing.toUpperCase()}</span>
+        </div>`;
+      }).join('');
+      block.innerHTML = `
+        <div class="event-head">
+          <div><div class="event-name">${ev.title}</div><div class="event-meta">${dateStr}${ev.venue ? ' • ' + ev.venue : ''}</div></div>
+        </div>
+        ${fightsHtml}
+        <div class="import-footer">
+          <span class="import-count">${ev.fights.length} fight(s) on this card</span>
+          <button class="btn btn-red btn-sm" onclick="importEvent(${ei})">IMPORT EVENT →</button>
+        </div>`;
+      res.appendChild(block);
+    });
+  } catch (err) {
+    msg.innerHTML = `<div class="msg msg-error">Error: ${err.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'SYNC NOW';
+  }
+}
+
+async function importEvent(ei) {
+  const event = storedEvents[ei];
+  const msg   = document.getElementById('syncMsg');
+  const boxes = document.querySelectorAll(`.ev-fight-${ei}`);
+  const selected = event.fights.filter((_, fi) => boxes[fi]?.checked);
+  if (!selected.length) { msg.innerHTML = '<div class="msg msg-error">No fights selected.</div>'; return; }
+
+  msg.innerHTML = `<div class="msg msg-info">Importing ${selected.length} fights...</div>`;
+  let ok = 0, skip = 0;
+
+  for (const fight of selected) {
+    try {
+      const f1Name = fight.fighters?.fighter_1?.full_name ?? fight.fighters?.fighter_1?.name;
+      const f2Name = fight.fighters?.fighter_2?.full_name ?? fight.fighters?.fighter_2?.name;
+      if (!f1Name || !f2Name) { skip++; continue; }
+
+      const weight = normaliseWeight(fight.division);
+      const rounds = [4,6,8,10,12].includes(fight.scheduled_rounds) ? fight.scheduled_rounds : 12;
+      const fdate  = event.date ? new Date(event.date).toISOString() : new Date().toISOString();
+
+      // Get records from API fighters data
+      const f1Stats = fight.fighters?.fighter_1;
+      const f2Stats = fight.fighters?.fighter_2;
+      const f1Record = f1Stats?.record ?? 'TBA';
+      const f2Record = f2Stats?.record ?? 'TBA';
+
+      const { data: fa, error: e1 } = await db.from('fighters')
+        .upsert({ name: f1Name, record: f1Record, weight_class: weight }, { onConflict: 'name' })
+        .select().single();
+      if (e1) throw e1;
+
+      const { data: fb, error: e2 } = await db.from('fighters')
+        .upsert({ name: f2Name, record: f2Record, weight_class: weight }, { onConflict: 'name' })
+        .select().single();
+      if (e2) throw e2;
+
+      const { error: e3 } = await db.from('fights').insert({
+        fighter_a_id: fa.id, fighter_b_id: fb.id,
+        weight_class: weight, scheduled_rounds: rounds,
+        fight_date: fdate, venue: event.venue ?? null,
+        event_name: event.title ?? null, status: 'upcoming'
+      });
+      if (e3 && !e3.message.includes('duplicate')) throw e3;
+      ok++;
+    } catch(e) { console.error(e); skip++; }
+  }
+
+  msg.innerHTML = `<div class="msg msg-success">✓ Imported ${ok} fights${skip ? ` (${skip} skipped)` : ''}.</div>`;
+  loadFights();
+loadFighterPhotos();
+}
+
+// ── FIGHTER DATA (Photos + Records) ──────────────────────────
+async function fetchFighterData() {
+  const btn  = document.getElementById('photosBtn');
+  const msg  = document.getElementById('photosMsg');
+  const list = document.getElementById('fightersList');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Fetching...';
+  msg.innerHTML = '<div class="msg msg-info">Loading fighters...</div>';
+  list.innerHTML = '';
+
+  try {
+    const { data: fighters, error } = await db.from('fighters').select('id, name, avatar_url, record');
+    if (error) throw error;
+    if (!fighters?.length) { msg.innerHTML = '<div class="msg msg-error">No fighters found.</div>'; return; }
+
+    msg.innerHTML = `<div class="msg msg-info">Processing ${fighters.length} fighters...</div>`;
+    let photosUpdated = 0, recordsUpdated = 0, notFound = 0;
+
+    for (const fighter of fighters) {
+      try {
+        const updates = {};
+
+        // Fetch record from Boxing Data API
+        const apiRes = await fetch(`https://${API_HOST}/v2/fighters/?name=${encodeURIComponent(fighter.name)}&page_size=1`, {
+          headers: { 'x-rapidapi-key': RAPIDAPI_KEY, 'x-rapidapi-host': API_HOST }
+        });
+        const apiJson = await apiRes.json();
+        const match = apiJson.data?.[0];
+
+        if (match?.stats) {
+          const { wins, losses, draws } = match.stats;
+          const record = `${wins ?? 0}-${losses ?? 0}${draws ? '-' + draws : ''}`;
+          if (record !== fighter.record) {
+            updates.record = record;
+            recordsUpdated++;
+          }
+        }
+
+        // Fetch photo from Wikipedia if missing
+        if (!fighter.avatar_url) {
+          const wikiRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(fighter.name + ' boxer')}&prop=pageimages&format=json&pithumbsize=200&origin=*`);
+          const wikiJson = await wikiRes.json();
+          const pages = wikiJson.query?.pages ?? {};
+          const page  = Object.values(pages)[0];
+          if (page?.thumbnail?.source && page.pageid !== -1) {
+            updates.avatar_url = page.thumbnail.source;
+            photosUpdated++;
+          }
+        }
+
+        // Apply updates
+        if (Object.keys(updates).length > 0) {
+          await db.from('fighters').update(updates).eq('id', fighter.id);
+        }
+
+        // Show in UI
+        const hasPhoto = updates.avatar_url || fighter.avatar_url;
+        const displayRecord = updates.record ?? fighter.record ?? 'TBA';
+        const div = document.createElement('div');
+        div.className = 'fighter-row';
+        div.innerHTML = `
+          <div class="fighter-avatar" style="border-color:${hasPhoto ? 'var(--red)' : 'var(--mid)'}">
+            ${hasPhoto
+              ? `<img src="${updates.avatar_url || fighter.avatar_url}" onerror="this.parentElement.innerHTML='<span class=fighter-avatar-initials>${fighter.name.slice(0,2).toUpperCase()}</span>'">`
+              : `<span class="fighter-avatar-initials">${fighter.name.slice(0,2).toUpperCase()}</span>`}
+          </div>
+          <div class="fighter-info">
+            <div class="fighter-name">${fighter.name}</div>
+            <div class="fighter-record">${displayRecord}</div>
+          </div>
+          <span class="${hasPhoto ? 'photo-status-ok' : 'photo-status-no'}">${hasPhoto ? '✓ Photo' : '✗ No photo'}</span>
+          ${updates.record ? '<span style="font-size:10px;color:var(--green)">✓ Record updated</span>' : ''}`;
+        list.appendChild(div);
+
+        await new Promise(res => setTimeout(res, 400));
+      } catch(e) { notFound++; }
+    }
+
+    msg.innerHTML = `<div class="msg msg-success">✓ Done — ${photosUpdated} photos, ${recordsUpdated} records updated${notFound ? ` (${notFound} not found)` : ''}.</div>`;
+  } catch(e) {
+    msg.innerHTML = `<div class="msg msg-error">Error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'FETCH ALL';
+  }
+}
+
+// ── ADD MANUALLY ──────────────────────────────────────────────
+async function addFight() {
+  const msg    = document.getElementById('addMsg');
+  const faName = document.getElementById('fa-name').value.trim();
+  const fbName = document.getElementById('fb-name').value.trim();
+  const fdate  = document.getElementById('fdate').value;
+  if (!faName || !fbName) { msg.innerHTML = '<div class="msg msg-error">Enter both fighter names.</div>'; return; }
+  if (!fdate) { msg.innerHTML = '<div class="msg msg-error">Set a fight date.</div>'; return; }
+  msg.innerHTML = '<div class="msg msg-info">Adding...</div>';
+  try {
+    const wc  = document.getElementById('wc').value;
+    const rds = parseInt(document.getElementById('rds').value);
+    const st  = document.getElementById('st').value;
+    const evn = document.getElementById('ev-name').value.trim() || null;
+    const ven = document.getElementById('venue').value.trim() || null;
+    const far = document.getElementById('fa-record').value.trim() || 'TBA';
+    const fbr = document.getElementById('fb-record').value.trim() || 'TBA';
+    const { data: fa, error: e1 } = await db.from('fighters').upsert({ name: faName, record: far, weight_class: wc }, { onConflict: 'name' }).select().single();
+    if (e1) throw e1;
+    const { data: fb, error: e2 } = await db.from('fighters').upsert({ name: fbName, record: fbr, weight_class: wc }, { onConflict: 'name' }).select().single();
+    if (e2) throw e2;
+    const { error: e3 } = await db.from('fights').insert({ fighter_a_id: fa.id, fighter_b_id: fb.id, weight_class: wc, scheduled_rounds: rds, fight_date: new Date(fdate).toISOString(), venue: ven, event_name: evn, status: st });
+    if (e3) throw e3;
+    msg.innerHTML = '<div class="msg msg-success">✓ Fight added!</div>';
+    ['fa-name','fa-record','fb-name','fb-record','ev-name','venue','fdate'].forEach(id => document.getElementById(id).value = '');
+    loadFights();
+loadFighterPhotos();
+  } catch(e) { msg.innerHTML = `<div class="msg msg-error">Error: ${e.message}</div>`; }
+}
+
+// ── SAVE RESULT ──────────────────────────────────────────────
+async function saveResult(id) {
+  const winner = document.getElementById('winner-' + id)?.value?.trim();
+  const method = document.getElementById('method-' + id)?.value;
+  if (!winner && !method) return;
+  const updates = {};
+  if (winner) updates.result_winner = winner;
+  if (method) updates.result_method = method;
+  const { error } = await db.from('fights').update(updates).eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  loadFights();
+}
+
+// ── MANAGE FIGHTS ─────────────────────────────────────────────
+async function loadFights() {
+  const el = document.getElementById('fightsList');
+  el.innerHTML = '<div class="empty">Loading...</div>';
+  const { data, error } = await db.from('fights')
+    .select('*, fighter_a:fighters!fights_fighter_a_id_fkey(name), fighter_b:fighters!fights_fighter_b_id_fkey(name)')
+    .order('fight_date', { ascending: true }).limit(50);
+  if (error || !data?.length) { el.innerHTML = '<div class="empty">No fights yet.</div>'; return; }
+  el.innerHTML = '<div class="fights-table">' + data.map(f => `
+    <div class="manage-row">
+      <div style="flex:1;">
+        <div class="manage-name">${f.fighter_a?.name ?? '?'} vs ${f.fighter_b?.name ?? '?'}</div>
+        <div class="manage-meta">${f.weight_class ?? ''} • ${f.event_name ?? 'No event'} • ${fmtDate(f.fight_date)}</div>
+      </div>
+<span class="status-pill s-${f.status}">${f.status.toUpperCase()} (AUTO)</span>
+      <div class="act-row" style="flex-wrap:wrap;">
+        ${f.status === 'completed' ? `
+          <input id="winner-${f.id}" placeholder="Winner name..." value="${f.result_winner || ''}"
+            style="background:var(--black);border:0.5px solid #3A3A3F;border-radius:8px;padding:6px 10px;color:var(--text);font-size:12px;width:140px;outline:none;" />
+          <select id="method-${f.id}" style="background:var(--mid);color:var(--text);border:0.5px solid #3A3A3F;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;">
+            <option value="">Method...</option>
+            <option value="KO" ${f.result_method==='KO'?'selected':''}>KO</option>
+            <option value="TKO" ${f.result_method==='TKO'?'selected':''}>TKO</option>
+            <option value="UD" ${f.result_method==='UD'?'selected':''}>Unanimous Decision</option>
+            <option value="SD" ${f.result_method==='SD'?'selected':''}>Split Decision</option>
+            <option value="MD" ${f.result_method==='MD'?'selected':''}>Majority Decision</option>
+            <option value="TD" ${f.result_method==='TD'?'selected':''}>Technical Decision</option>
+            <option value="RTD" ${f.result_method==='RTD'?'selected':''}>RTD</option>
+            <option value="DQ" ${f.result_method==='DQ'?'selected':''}>Disqualification</option>
+            <option value="Draw" ${f.result_method==='Draw'?'selected':''}>Draw</option>
+          </select>
+          <button class="btn btn-red btn-sm" onclick="saveResult('${f.id}')">SAVE RESULT</button>
+        ` : ''}
+        <select onchange="setStatus('${f.id}', this.value)" style="background:var(--mid);color:var(--text);border:0.5px solid #3A3A3F;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;">
+          <option value="">⚡ Override...</option>
+          <option value="upcoming">Force Upcoming</option>
+          <option value="live">Force Live</option>
+          <option value="completed">Force Completed</option>
+          <option value="cancelled">Cancel Fight</option>
+        </select>
+        <button class="btn btn-sm" style="background:#1a0505;color:#ff6b6b;" onclick="delFight('${f.id}')">✕</button>
+      </div>
+    </div>`).join('') + '</div>';
+}
+
+async function setStatus(id, status) {
+  if (!status) return;
+  await db.from('fights').update({ status }).eq('id', id);
+  loadFights();
+loadFighterPhotos();
+}
+
+async function delFight(id) {
+  if (!confirm('Delete this fight? Cannot be undone.')) return;
+  await db.from('fights').delete().eq('id', id);
+  loadFights();
+loadFighterPhotos();
+}
+
+loadFights();
+loadFighterPhotos();
+
+// ── MANAGE FIGHTER PHOTOS (manual) ───────────────────────────
+async function loadFighterPhotos() {
+  const el = document.getElementById('manualFightersList');
+  el.innerHTML = '<div class="empty">Loading...</div>';
+  const { data, error } = await db.from('fighters').select('id, name, avatar_url, record').order('name');
+  if (error || !data?.length) { el.innerHTML = '<div class="empty">No fighters yet.</div>'; return; }
+  el.innerHTML = '<div style="display:flex;flex-direction:column;gap:10px;">' + data.map(f => `
+    <div class="fighter-row" style="flex-wrap:wrap;gap:10px;">
+      <div class="fighter-avatar" style="border-color:${f.avatar_url ? 'var(--red)' : 'var(--mid)'}">
+        ${f.avatar_url
+          ? `<img src="${f.avatar_url}" onerror="this.parentElement.innerHTML='<span class=fighter-avatar-initials>${f.name.slice(0,2).toUpperCase()}</span>'">`
+          : `<span class="fighter-avatar-initials">${f.name.slice(0,2).toUpperCase()}</span>`}
+      </div>
+      <div class="fighter-info">
+        <div class="fighter-name">${f.name}</div>
+        <div class="fighter-record">${f.record ?? 'TBA'}</div>
+        <div style="font-size:10px;color:${f.avatar_url ? 'var(--green)' : 'var(--muted)'};">${f.avatar_url ? '✓ Has photo' : '✗ No photo'}</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex:1;min-width:200px;">
+        <input id="photo-${f.id}" placeholder="Paste image URL..." value="${f.avatar_url || ''}"
+          style="flex:1;background:var(--black);border:0.5px solid #3A3A3F;border-radius:8px;padding:8px 10px;color:var(--text);font-size:12px;outline:none;" />
+        <button class="btn btn-red btn-sm" onclick="updateFighterPhoto('${f.id}')">SAVE</button>
+      </div>
+    </div>
+  `).join('') + '</div>';
+}
+
+async function updateFighterPhoto(id) {
+  const input = document.getElementById('photo-' + id);
+  const url   = input?.value?.trim();
+  if (!url) return;
+  const { error } = await db.from('fighters').update({ avatar_url: url }).eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  loadFighterPhotos();
+}
+
+
+// ── AUTO UPDATE RESULTS ───────────────────────────────────────
+async function fetchResults() {
+  const btn = document.getElementById('resultsBtn');
+  const msg = document.getElementById('resultsMsg');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Checking...';
+  msg.innerHTML = '<div class="msg msg-info">Scanning last 30 days of fights for results...</div>';
+
+  try {
+    // Use same schedule endpoint - it returns results for completed fights
+    const r = await fetch(
+      `https://${API_HOST}/v2/fights/schedule/?days=7&page_size=50&page_num=1&date_sort=DESC`,
+      { headers: { 'x-rapidapi-key': RAPIDAPI_KEY, 'x-rapidapi-host': API_HOST } }
+    );
+    if (!r.ok) throw new Error(`API error ${r.status}`);
+    const json = await r.json();
+    const fights = (json.data ?? []).filter(f => f.results || f.fighters?.fighter_1?.winner || f.fighters?.fighter_2?.winner);
+
+    if (!fights.length) {
+      msg.innerHTML = '<div class="msg msg-info">No results found yet. Try again after fight night.</div>';
+      return;
+    }
+
+    let updated = 0;
+    for (const fight of fights) {
+      const f1Name = fight.fighters?.fighter_1?.full_name ?? fight.fighters?.fighter_1?.name;
+      const f2Name = fight.fighters?.fighter_2?.full_name ?? fight.fighters?.fighter_2?.name;
+      if (!f1Name || !f2Name) continue;
+
+      const winner = fight.fighters?.fighter_1?.winner ? f1Name :
+                     fight.fighters?.fighter_2?.winner ? f2Name : null;
+
+      const result = fight.results ?? {};
+      const methodRaw = (result.method ?? fight.result_method ?? '').toLowerCase();
+      let method = '';
+      if (methodRaw.includes('unanimous')) method = 'UD';
+      else if (methodRaw.includes('split')) method = 'SD';
+      else if (methodRaw.includes('majority')) method = 'MD';
+      else if (methodRaw.includes('tko') || methodRaw.includes('technical knockout')) method = 'TKO';
+      else if (methodRaw.includes('ko') || methodRaw.includes('knockout')) method = 'KO';
+      else if (methodRaw.includes('rtd') || methodRaw.includes('retire')) method = 'RTD';
+      else if (methodRaw.includes('dq') || methodRaw.includes('disqualif')) method = 'DQ';
+      else if (methodRaw.includes('draw')) method = 'Draw';
+      else if (result.method) method = result.method;
+
+      if (!winner && !method) continue;
+
+      const { data: fa } = await db.from('fighters').select('id').ilike('name', f1Name).single();
+      const { data: fb } = await db.from('fighters').select('id').ilike('name', f2Name).single();
+      if (!fa || !fb) continue;
+
+      const { data: dbFight } = await db.from('fights')
+        .select('id, result_winner, result_method')
+        .eq('fighter_a_id', fa.id)
+        .eq('fighter_b_id', fb.id)
+        .maybeSingle();
+
+      if (!dbFight || (dbFight.result_winner && dbFight.result_method)) continue;
+
+      const updates = {};
+      if (winner && !dbFight.result_winner) updates.result_winner = winner;
+      if (method && !dbFight.result_method) updates.result_method = method;
+
+      if (Object.keys(updates).length > 0) {
+        await db.from('fights').update(updates).eq('id', dbFight.id);
+        updated++;
+      }
+    }
+
+    msg.innerHTML = `<div class="msg msg-success">✓ Updated ${updated} fight result${updated !== 1 ? 's' : ''}.</div>`;
+    loadFights();
+  } catch(e) {
+    msg.innerHTML = `<div class="msg msg-error">Error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'FETCH RESULTS';
+  }
+}
+
+</script>
+</body>
+</html>
