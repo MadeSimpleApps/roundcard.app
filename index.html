@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RoundCard — Score it. Own it. Defend it.</title>
+<meta name="description" content="Score professional boxing fights round by round. Submit your scorecard, see the community consensus, climb the rankings. RoundCard puts you in the judge's seat.">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --black: #0D0D0F;
+    --red: #E8001D;
+    --gold: #C9A84C;
+    --bone: #F5F0E8;
+    --gray: #1A1A1E;
+    --mid: #2A2A2F;
+    --sub: #9494A0;
+  }
+  body { background: var(--black); color: var(--bone); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+  /* NAV */
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 0.5px solid var(--mid); position: sticky; top: 0; background: rgba(13,13,15,0.95); backdrop-filter: blur(10px); z-index: 100; }
+  .logo { font-size: 22px; font-weight: 900; letter-spacing: 2px; text-decoration: none; color: var(--bone); }
+  .logo span { color: var(--red); }
+  .nav-btn { background: var(--red); color: white; border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 700; cursor: pointer; text-decoration: none; letter-spacing: 0.5px; }
+
+  /* HERO */
+  .hero { text-align: center; padding: 100px 20px 80px; max-width: 800px; margin: 0 auto; }
+  .hero-tag { display: inline-block; background: rgba(232,0,29,0.12); border: 0.5px solid rgba(232,0,29,0.4); color: var(--red); font-size: 12px; font-weight: 700; letter-spacing: 1.5px; padding: 6px 16px; border-radius: 20px; margin-bottom: 32px; }
+  .hero h1 { font-size: clamp(48px, 8vw, 96px); font-weight: 900; line-height: 0.95; letter-spacing: -2px; margin-bottom: 24px; }
+  .hero h1 span { color: var(--red); }
+  .hero p { font-size: 18px; color: var(--sub); line-height: 1.7; max-width: 560px; margin: 0 auto 40px; }
+  .hero-btns { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+  .btn-primary { background: var(--red); color: white; border: none; border-radius: 12px; padding: 16px 32px; font-size: 16px; font-weight: 700; cursor: pointer; text-decoration: none; letter-spacing: 0.5px; display: inline-block; }
+  .btn-secondary { background: transparent; color: var(--bone); border: 0.5px solid var(--mid); border-radius: 12px; padding: 16px 32px; font-size: 16px; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-block; }
+
+  /* TAGLINE */
+  .tagline { text-align: center; padding: 60px 20px; border-top: 0.5px solid var(--mid); border-bottom: 0.5px solid var(--mid); }
+  .tagline p { font-size: clamp(24px, 4vw, 40px); font-weight: 900; letter-spacing: 2px; color: var(--sub); }
+  .tagline p span { color: var(--bone); }
+
+  /* FEATURES */
+  .features { max-width: 1000px; margin: 0 auto; padding: 80px 20px; }
+  .features h2 { text-align: center; font-size: 36px; font-weight: 900; margin-bottom: 60px; letter-spacing: -0.5px; }
+  .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+  .feature-card { background: var(--gray); border: 0.5px solid var(--mid); border-radius: 16px; padding: 32px; }
+  .feature-icon { font-size: 36px; margin-bottom: 16px; }
+  .feature-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 10px; color: var(--bone); }
+  .feature-card p { font-size: 14px; color: var(--sub); line-height: 1.6; }
+
+  /* HOW IT WORKS */
+  .how { background: var(--gray); padding: 80px 20px; }
+  .how-inner { max-width: 800px; margin: 0 auto; text-align: center; }
+  .how h2 { font-size: 36px; font-weight: 900; margin-bottom: 60px; }
+  .steps { display: flex; flex-direction: column; gap: 32px; text-align: left; }
+  .step { display: flex; gap: 24px; align-items: flex-start; }
+  .step-num { background: var(--red); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 18px; flex-shrink: 0; }
+  .step-content h3 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+  .step-content p { font-size: 14px; color: var(--sub); line-height: 1.6; }
+
+  /* TIERS */
+  .tiers { max-width: 900px; margin: 0 auto; padding: 80px 20px; text-align: center; }
+  .tiers h2 { font-size: 36px; font-weight: 900; margin-bottom: 16px; }
+  .tiers > p { color: var(--sub); margin-bottom: 48px; }
+  .tiers-grid { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .tier { background: var(--gray); border: 0.5px solid var(--mid); border-radius: 12px; padding: 20px 24px; text-align: center; }
+  .tier-emoji { font-size: 28px; margin-bottom: 8px; }
+  .tier-name { font-size: 12px; font-weight: 700; color: var(--sub); letter-spacing: 1px; }
+
+  /* CTA */
+  .cta { text-align: center; padding: 100px 20px; background: linear-gradient(180deg, var(--black) 0%, #1a0308 100%); }
+  .cta h2 { font-size: clamp(36px, 6vw, 64px); font-weight: 900; margin-bottom: 16px; letter-spacing: -1px; }
+  .cta h2 span { color: var(--red); }
+  .cta p { color: var(--sub); margin-bottom: 40px; font-size: 18px; }
+
+  /* PRIVACY */
+  .privacy { background: var(--gray); border-top: 0.5px solid var(--mid); padding: 80px 20px; }
+  .privacy-inner { max-width: 760px; margin: 0 auto; }
+  .privacy h2 { font-size: 32px; font-weight: 900; margin-bottom: 8px; }
+  .privacy-date { color: var(--sub); font-size: 13px; margin-bottom: 48px; }
+  .privacy h3 { font-size: 16px; font-weight: 700; color: var(--red); margin: 32px 0 12px; letter-spacing: 0.5px; }
+  .privacy p { font-size: 14px; color: var(--sub); line-height: 1.8; margin-bottom: 12px; }
+  .privacy ul { margin: 0 0 12px 20px; }
+  .privacy ul li { font-size: 14px; color: var(--sub); line-height: 1.8; }
+
+  /* FOOTER */
+  footer { border-top: 0.5px solid var(--mid); padding: 40px 20px; text-align: center; }
+  footer p { color: var(--sub); font-size: 13px; }
+  footer a { color: var(--sub); text-decoration: none; }
+  footer a:hover { color: var(--bone); }
+
+  @media (max-width: 600px) {
+    nav { padding: 16px 20px; }
+    .hero { padding: 60px 20px 60px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo">ROUND<span>CARD</span></a>
+  <a href="https://play.google.com/store" class="nav-btn">GET THE APP</a>
+</nav>
+
+<section class="hero">
+  <div class="hero-tag">🥊 NOW AVAILABLE ON ANDROID</div>
+  <h1>Score it.<br><span>Own it.</span><br>Defend it.</h1>
+  <p>Score professional boxing fights round by round, submit your scorecard to the community, and see how your calls stack up against thousands of other judges worldwide.</p>
+  <div class="hero-btns">
+    <a href="https://play.google.com/store" class="btn-primary">Download on Android →</a>
+    <a href="#how-it-works" class="btn-secondary">How it works</a>
+  </div>
+</section>
+
+<div class="tagline">
+  <p><span>Score it.</span> Own it. <span>Defend it.</span></p>
+</div>
+
+<section class="features">
+  <h2>Everything a real judge needs</h2>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">🔴</div>
+      <h3>Score in Real Time</h3>
+      <p>Score each round as it happens with our clean +/- interface. Lock your round, then instantly see what the community thinks.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📋</div>
+      <h3>Your Card. Your Call.</h3>
+      <p>Submit your completed scorecard and it becomes part of the permanent record. Your scores, your opinion, forever on the record.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <h3>Community Consensus</h3>
+      <p>See how your scores compare to thousands of other judges. Watch the community bar shift round by round in real time.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🏆</div>
+      <h3>Climb the Rankings</h3>
+      <p>Rise through the tiers from Newcomer to Master Judge. Earn badges, maintain your weekly streak, and build your reputation.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">👥</div>
+      <h3>Follow the Best Judges</h3>
+      <p>Find judges whose scoring you respect. Follow them, rate their cards with a glove tap, and debate in threaded comments.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔔</div>
+      <h3>Never Miss a Fight</h3>
+      <p>Set reminders on upcoming fights. Get notified when a fight goes live. Full fight cards updated every week.</p>
+    </div>
+  </div>
+</section>
+
+<section class="how" id="how-it-works">
+  <div class="how-inner">
+    <h2>How it works</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3>Pick a fight to score</h3>
+          <p>Browse upcoming and live fights on the Fight Night screen. Tap Score Now when the first bell rings.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3>Score each round</h3>
+          <p>Use the +/- buttons to award rounds to each fighter. Lock your score before the next round starts.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3>Submit your scorecard</h3>
+          <p>When the final bell rings, submit your card. Real judges can't change their scores — neither can you.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h3>See how you compare</h3>
+          <p>Your scorecard joins thousands of others. See the community consensus, read comments, and defend your card.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="tiers">
+  <h2>Rise through the ranks</h2>
+  <p>Every scorecard you submit builds your judge profile. Climb from Newcomer to Master Judge.</p>
+  <div class="tiers-grid">
+    <div class="tier"><div class="tier-emoji">🥋</div><div class="tier-name">NEWCOMER</div></div>
+    <div class="tier"><div class="tier-emoji">🏅</div><div class="tier-name">CLUB</div></div>
+    <div class="tier"><div class="tier-emoji">🎖️</div><div class="tier-name">REGIONAL</div></div>
+    <div class="tier"><div class="tier-emoji">⭐</div><div class="tier-name">SENIOR</div></div>
+    <div class="tier"><div class="tier-emoji">🌟</div><div class="tier-name">ELITE</div></div>
+    <div class="tier"><div class="tier-emoji">👑</div><div class="tier-name">MASTER JUDGE</div></div>
+  </div>
+</section>
+
+<section class="cta">
+  <h2>Ready to take<br>your <span>seat</span>?</h2>
+  <p>Download RoundCard free on Android. iOS coming soon.</p>
+  <a href="https://play.google.com/store" class="btn-primary">Download on Android →</a>
+</section>
+
+<section class="privacy" id="privacy">
+  <div class="privacy-inner">
+    <h2>Privacy Policy</h2>
+    <p class="privacy-date">Last updated: May 2026</p>
+
+    <h3>WHAT WE COLLECT</h3>
+    <ul>
+      <li>Email address (for account creation)</li>
+      <li>Display name, username, bio and profile photo (optional, set by you)</li>
+      <li>Scorecards and round scores you submit</li>
+      <li>Comments and ratings you post</li>
+      <li>Device information for app functionality</li>
+    </ul>
+
+    <h3>WHAT WE DON'T COLLECT</h3>
+    <ul>
+      <li>We do not sell your data to third parties</li>
+      <li>We do not serve advertisements</li>
+      <li>We do not share your personal information with anyone outside of providing the service</li>
+    </ul>
+
+    <h3>HOW WE USE YOUR DATA</h3>
+    <ul>
+      <li>To create and manage your account</li>
+      <li>To display your scorecards and profile to the community (only what you choose to make public)</li>
+      <li>To calculate leaderboard rankings and judge tiers</li>
+      <li>To send notifications you have opted into</li>
+    </ul>
+
+    <h3>DATA STORAGE</h3>
+    <p>Your data is stored securely on Supabase servers. We use industry-standard encryption for data in transit and at rest.</p>
+
+    <h3>YOUR RIGHTS</h3>
+    <ul>
+      <li>You can edit or delete your profile at any time from the app</li>
+      <li>You can withdraw submitted scorecards at any time</li>
+      <li>You can request full deletion of your account and data by emailing us</li>
+    </ul>
+
+    <h3>CONTACT</h3>
+    <p>For any privacy queries: <a href="mailto:privacy@roundcard.app" style="color:var(--red)">privacy@roundcard.app</a></p>
+
+    <h3>CHANGES</h3>
+    <p>We may update this policy as the app evolves. Continued use of the app constitutes acceptance of any changes.</p>
+  </div>
+</section>
+
+<footer>
+  <p style="font-size:22px;font-weight:900;letter-spacing:2px;margin-bottom:12px;">ROUND<span style="color:#E8001D">CARD</span></p>
+  <p style="margin-bottom:8px;">Score it. Own it. Defend it.</p>
+  <p><a href="#privacy">Privacy Policy</a> · <a href="mailto:hello@roundcard.app">hello@roundcard.app</a></p>
+  <p style="margin-top:16px;">© 2026 RoundCard. All rights reserved.</p>
+</footer>
+
+</body>
+</html>
