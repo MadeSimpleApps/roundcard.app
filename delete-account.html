@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Delete Account — RoundCard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0D0D0F; color: #F5F0E8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 40px; border-bottom: 0.5px solid #2A2A2F; }
+  .logo { font-size: 20px; font-weight: 900; letter-spacing: 2px; text-decoration: none; color: #F5F0E8; }
+  .logo span { color: #E8001D; }
+  .container { max-width: 720px; margin: 0 auto; padding: 60px 24px; }
+  h1 { font-size: 40px; font-weight: 900; letter-spacing: -1px; margin-bottom: 8px; }
+  .subtitle { color: #9494A0; font-size: 16px; margin-bottom: 48px; }
+  h2 { font-size: 16px; font-weight: 700; color: #E8001D; letter-spacing: 1px; text-transform: uppercase; margin: 32px 0 12px; }
+  p { font-size: 15px; color: #9494A0; line-height: 1.8; margin-bottom: 12px; }
+  ul { margin: 0 0 16px 20px; }
+  ul li { font-size: 15px; color: #9494A0; line-height: 1.8; }
+  .steps { display: flex; flex-direction: column; gap: 16px; margin: 24px 0; }
+  .step { display: flex; gap: 16px; align-items: flex-start; background: #1A1A1E; border-radius: 12px; padding: 20px; border: 0.5px solid #2A2A2F; }
+  .step-num { background: #E8001D; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 16px; flex-shrink: 0; }
+  .step-content h3 { font-size: 15px; font-weight: 700; color: #F5F0E8; margin-bottom: 4px; }
+  .step-content p { margin: 0; font-size: 14px; }
+  .email-btn { display: inline-block; background: #E8001D; color: white; border-radius: 10px; padding: 14px 28px; font-size: 15px; font-weight: 700; text-decoration: none; margin: 24px 0; letter-spacing: 0.5px; }
+  .warning { background: rgba(232,0,29,0.08); border: 0.5px solid rgba(232,0,29,0.3); border-radius: 12px; padding: 20px; margin: 24px 0; }
+  .warning p { color: #E8001D; margin: 0; font-size: 14px; }
+  footer { border-top: 0.5px solid #2A2A2F; padding: 32px 40px; text-align: center; }
+  footer p { color: #6B6B72; font-size: 13px; }
+  footer a { color: #6B6B72; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo">ROUND<span>CARD</span></a>
+</nav>
+
+<div class="container">
+  <h1>Delete Your Account</h1>
+  <p class="subtitle">We're sorry to see you go. Here's how to request deletion of your account and data.</p>
+
+  <h2>Option 1 — Delete in the app</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h3>Open RoundCard</h3>
+        <p>Launch the app on your device and make sure you're logged in.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <h3>Go to Profile</h3>
+        <p>Tap the Profile tab at the bottom of the screen.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <h3>Tap Edit Profile</h3>
+        <p>Scroll down to find the Delete Account option at the bottom of the Edit Profile screen.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <h3>Confirm deletion</h3>
+        <p>Confirm your decision. Your account and all associated data will be permanently deleted.</p>
+      </div>
+    </div>
+  </div>
+
+  <h2>Option 2 — Request by email</h2>
+  <p>If you can't access the app, email us directly and we'll delete your account within 30 days.</p>
+  <a href="mailto:privacy@roundcard.app?subject=Delete My Account&body=Please delete my RoundCard account and all associated data. My registered email address is: " class="email-btn">Email Us to Delete Account →</a>
+
+  <h2>What gets deleted</h2>
+  <ul>
+    <li>Your account and profile information</li>
+    <li>All scorecards you have submitted</li>
+    <li>All comments and ratings you have posted</li>
+    <li>Your followers and following relationships</li>
+    <li>Your badges, streaks and stats</li>
+    <li>All notifications associated with your account</li>
+  </ul>
+
+  <h2>What we retain</h2>
+  <p>We may retain anonymised, aggregated data (such as fight scoring statistics) that cannot be linked back to you personally. This data helps us improve the app experience for all users.</p>
+
+  <div class="warning">
+    <p>⚠️ Account deletion is permanent and cannot be undone. All your scorecards and data will be removed and cannot be recovered.</p>
+  </div>
+
+  <h2>Processing time</h2>
+  <p>Deletion requests made in the app are processed immediately. Email requests are processed within 30 days of receipt.</p>
+
+  <h2>Contact</h2>
+  <p>For any questions about account deletion or your data, contact us at <a href="mailto:privacy@roundcard.app" style="color:#E8001D">privacy@roundcard.app</a></p>
+</div>
+
+<footer>
+  <p><a href="/">Home</a> &nbsp;·&nbsp; <a href="/#privacy">Privacy Policy</a> &nbsp;·&nbsp; <a href="mailto:privacy@roundcard.app">privacy@roundcard.app</a> &nbsp;·&nbsp; © 2026 RoundCard</p>
+</footer>
+
+</body>
+</html>
