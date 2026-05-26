@@ -421,5 +421,12 @@ footer a:hover{color:var(--bone)}
   <p><a href="#privacy">Privacy Policy</a> &nbsp;·&nbsp; <a href="mailto:hello@roundcard.app">hello@roundcard.app</a> &nbsp;·&nbsp; © 2026 RoundCard</p>
 </footer>
 
+  <script>
+  // Redirect password reset links to the reset page
+  if (window.location.hash.includes('type=recovery')) {
+    window.location.href = '/reset-password.html' + window.location.hash;
+  }
+</script>
+
 </body>
 </html>
