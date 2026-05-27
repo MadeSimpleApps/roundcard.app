@@ -825,14 +825,36 @@ async function sendBroadcast() {
   if (!confirm(`Send "${title}" to ALL users?`)) return;
   msg('notifMsg', 'Sending...', 'info');
   try {
-    const {data: users} = await db.from('users').select('id');
+    const {data: users} = await db.from('users').select('id, push_token');
     if (!users?.length) { msg('notifMsg', 'No users found.', 'error'); return; }
+
+    // Insert in-app notifications in batches of 50
     const notifications = users.map(u => ({user_id: u.id, type, title, body, data: {}}));
-    // Insert in batches of 50
     for (let i = 0; i < notifications.length; i += 50) {
       await db.from('notifications').insert(notifications.slice(i, i + 50));
     }
-    msg('notifMsg', `✓ Sent to ${users.length} users.`, 'success');
+
+    // Send push notifications via Expo Push API
+    const tokens = users.map(u => u.push_token).filter(Boolean);
+    if (tokens.length > 0) {
+      // Send in batches of 100
+      for (let i = 0; i < tokens.length; i += 100) {
+        const batch = tokens.slice(i, i + 100).map(token => ({
+          to: token,
+          sound: 'default',
+          title,
+          body,
+          data: { type },
+        }));
+        await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify(batch),
+        });
+      }
+    }
+
+    msg('notifMsg', `✓ Sent to ${users.length} users (${tokens.length} push notifications).`, 'success');
     document.getElementById('notifTitle').value = '';
     document.getElementById('notifBody').value = '';
   } catch(e) { msg('notifMsg', `Error: ${e.message}`, 'error'); }
