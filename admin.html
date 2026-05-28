@@ -834,24 +834,20 @@ async function sendBroadcast() {
       await db.from('notifications').insert(notifications.slice(i, i + 50));
     }
 
-    // Send push notifications via Expo Push API
+    // Send push notifications via Supabase Edge Function
     const tokens = users.map(u => u.push_token).filter(Boolean);
     if (tokens.length > 0) {
-      // Send in batches of 100
-      for (let i = 0; i < tokens.length; i += 100) {
-        const batch = tokens.slice(i, i + 100).map(token => ({
-          to: token,
-          sound: 'default',
-          title,
-          body,
-          data: { type },
-        }));
-        await fetch('https://exp.host/--/api/v2/push/send', {
-          method: 'POST',
-          headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-          body: JSON.stringify(batch),
-        });
-      }
+      await fetch(`${SUPABASE_URL}/functions/v1/send-notifications`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+        },
+        body: JSON.stringify({
+          type: 'broadcast',
+          data: { tokens, title, body, notifType: type }
+        }),
+      });
     }
 
     msg('notifMsg', `✓ Sent to ${users.length} users (${tokens.length} push notifications).`, 'success');
