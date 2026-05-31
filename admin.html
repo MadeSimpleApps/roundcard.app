@@ -51,6 +51,15 @@
   .field input, .field select, .field textarea { background: var(--mid); border: 0.5px solid #3A3A3F; border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 14px; outline: none; width: 100%; }
   .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--red); }
   .section-lbl { font-size: 12px; font-weight: 700; color: var(--sub); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
+  .event-group { margin-bottom: 16px; border: 0.5px solid var(--mid); border-radius: 12px; overflow: hidden; }
+  .event-group-header { background: #0f0a00; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+  .event-group-header:hover { background: #1a1200; }
+  .event-group-title { font-size: 14px; font-weight: 700; color: var(--bone); }
+  .event-group-meta { font-size: 11px; color: var(--sub); margin-top: 2px; }
+  .event-group-toggle { color: var(--red); font-size: 18px; transition: transform 0.2s; }
+  .event-group-toggle.open { transform: rotate(180deg); }
+  .event-group-body { display: none; padding: 8px; }
+  .event-group-body.open { display: block; }
   .manage-row { background: var(--mid); border-radius: 10px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
   .manage-name { font-weight: 700; font-size: 14px; color: var(--bone); }
   .manage-meta { font-size: 11px; color: var(--sub); margin-top: 2px; }
@@ -548,13 +557,25 @@ async function loadFights() {
   el.innerHTML = '<div class="empty">Loading...</div>';
   const {data, error} = await db.from('fights')
     .select('*, fighter_a:fighters!fights_fighter_a_id_fkey(name), fighter_b:fighters!fights_fighter_b_id_fkey(name)')
-    .order('fight_date', {ascending: false}).limit(100);
+    .order('fight_date', {ascending: false}).limit(200);
   if (error || !data?.length) { el.innerHTML = '<div class="empty">No fights yet.</div>'; return; }
-  el.innerHTML = data.map(f => `
+
+  // Group by event name
+  const groups = {};
+  data.forEach(f => {
+    const key = f.event_name || 'No Event';
+    if (!groups[key]) groups[key] = { fights: [], date: f.fight_date, status: f.status };
+    groups[key].fights.push(f);
+    // Use most recent status for group header
+    if (f.status === 'live') groups[key].status = 'live';
+    else if (f.status === 'upcoming' && groups[key].status !== 'live') groups[key].status = 'upcoming';
+  });
+
+  const fightRow = (f) => `
     <div class="manage-row">
       <div style="flex:1;">
         <div class="manage-name">${f.fighter_a?.name ?? '?'} vs ${f.fighter_b?.name ?? '?'}</div>
-        <div class="manage-meta">${f.weight_class ?? ''} · ${f.event_name ?? 'No event'} · ${fmtDate(f.fight_date)}</div>
+        <div class="manage-meta">${f.weight_class ?? ''} · ${fmtDate(f.fight_date)}</div>
         ${f.result_winner ? `<div style="font-size:11px;color:var(--green);margin-top:2px;">✓ ${f.result_winner} · ${f.result_method ?? ''}</div>` : ''}
       </div>
       <span class="status-pill s-${f.status}">${f.status.toUpperCase()}</span>
@@ -583,7 +604,58 @@ async function loadFights() {
         </select>
         <button class="btn btn-sm" style="background:#1a0505;color:#ff6b6b;" onclick="delFight('${f.id}')">✕</button>
       </div>
-    </div>`).join('');
+    </div>`;
+
+  el.innerHTML = Object.entries(groups).map(([eventName, group], idx) => {
+    const isOpen = group.status === 'live' || group.status === 'upcoming';
+    const statusColor = group.status === 'live' ? 'var(--red)' : group.status === 'upcoming' ? 'var(--gold)' : 'var(--sub)';
+    return `
+      <div class="event-group">
+        <div class="event-group-header" onclick="toggleEventGroup(${idx})">
+          <div>
+            <div class="event-group-title">${eventName}</div>
+            <div class="event-group-meta" style="color:${statusColor}">${group.fights.length} fights · ${fmtDate(group.date)} · ${group.status.toUpperCase()}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button class="btn btn-mid btn-sm" onclick="event.stopPropagation();prefillEventForm('${eventName.replace(/'/g,"\'")}', '${group.date}', '${(group.fights[0]?.venue || '').replace(/'/g,"\'")}')">+ Add Fight</button>
+            <span class="event-group-toggle ${isOpen ? 'open' : ''}" id="toggle-${idx}">▾</span>
+          </div>
+        </div>
+        <div class="event-group-body ${isOpen ? 'open' : ''}" id="group-${idx}">
+          ${group.fights.map(fightRow).join('')}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function prefillEventForm(eventName, date, venue) {
+  // Switch to the Add Fight form
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-fights').classList.add('active');
+  document.querySelector('[onclick="showTab(\'fights\')"]').classList.add('active');
+
+  // Pre-fill the form
+  document.getElementById('ev-name').value = eventName;
+  document.getElementById('venue').value = venue || '';
+
+  // Set date - use the event date
+  if (date) {
+    const d = new Date(date);
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+    document.getElementById('fdate').value = local.toISOString().slice(0, 16);
+  }
+
+  // Scroll to add fight form
+  document.getElementById('ev-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('fa-name').focus();
+}
+
+function toggleEventGroup(idx) {
+  const body = document.getElementById('group-' + idx);
+  const toggle = document.getElementById('toggle-' + idx);
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
 }
 
 async function saveResult(id) {
