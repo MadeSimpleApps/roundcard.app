@@ -130,6 +130,7 @@
   <button class="tab-btn" onclick="showTab('scorecards')">📋 Scorecards</button>
   <button class="tab-btn" onclick="showTab('notifications')">🔔 Notifications</button>
   <button class="tab-btn" onclick="showTab('reports')">🚨 Reports</button>
+  <button class="tab-btn" onclick="showTab('ads')">📢 Ads</button>
 </div>
 
 <!-- ═══════════════════════════════════ -->
@@ -361,12 +362,99 @@
 </div>
 
 <script>
+
+function previewAd() {
+  var url = document.getElementById('adImageUrl').value.trim();
+  if (!url) { msg('adMsg', 'Enter an image URL first.', 'error'); return; }
+  document.getElementById('adPreviewImg').src = url;
+  document.getElementById('adPreview').style.display = 'block';
+}
+
+async function saveAd() {
+  var advertiser = document.getElementById('adAdvertiser').value.trim();
+  var placement  = document.getElementById('adPlacement').value;
+  var imageUrl   = document.getElementById('adImageUrl').value.trim();
+  var linkUrl    = document.getElementById('adLinkUrl').value.trim();
+  if (!imageUrl) { msg('adMsg', 'Image URL is required.', 'error'); return; }
+  msg('adMsg', 'Saving...', 'info');
+  var ins = await db.from('ads').insert({
+    advertiser: advertiser || null,
+    placement: placement,
+    image_url: imageUrl,
+    link_url: linkUrl || null,
+    is_active: true
+  });
+  if (ins.error) { msg('adMsg', 'Error: ' + ins.error.message, 'error'); return; }
+  msg('adMsg', 'Ad saved!', 'success');
+  document.getElementById('adAdvertiser').value = '';
+  document.getElementById('adImageUrl').value = '';
+  document.getElementById('adLinkUrl').value = '';
+  document.getElementById('adPreview').style.display = 'none';
+  loadAds();
+}
+
+async function loadAds() {
+  var el = document.getElementById('adsList');
+  if (!el) return;
+  var res = await db.from('ads').select('*').order('created_at', {ascending: false});
+  if (!res.data || !res.data.length) { el.innerHTML = '<div class="empty">No ads yet.</div>'; return; }
+  var labels = {
+    splash: 'Splash Screen',
+    fights_between: 'Fights Screen',
+    post_submit: 'Post Submit',
+    leaderboard: 'Leaderboard',
+    fight_detail: 'Fight Detail'
+  };
+  var html = '';
+  for (var i = 0; i < res.data.length; i++) {
+    var ad = res.data[i];
+    var label = labels[ad.placement] || ad.placement;
+    var statusColor = ad.is_active ? 'var(--green)' : 'var(--sub)';
+    var statusText = ad.is_active ? 'LIVE' : 'PAUSED';
+    var checkedAttr = ad.is_active ? 'checked' : '';
+    var adId = ad.id;
+    html += '<div class="manage-row" style="align-items:flex-start;gap:12px;">';
+    html += '<img src="' + ad.image_url + '" style="width:80px;height:50px;object-fit:cover;border-radius:6px;flex-shrink:0;border:0.5px solid #2A2A2F;"/>';
+    html += '<div style="flex:1;">';
+    html += '<div class="manage-name">' + (ad.advertiser || 'Unnamed Ad') + '</div>';
+    html += '<div class="manage-meta">' + label + '</div>';
+    if (ad.link_url) {
+      html += '<div style="font-size:11px;color:var(--sub);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px;">' + ad.link_url + '</div>';
+    }
+    html += '</div>';
+    html += '<div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">';
+    html += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:' + statusColor + ';">';
+    html += '<input type="checkbox" ' + checkedAttr + ' data-id="' + adId + '" onchange="toggleAd(this.dataset.id, this.checked)" style="cursor:pointer;"/>';
+    html += statusText + '</label>';
+    html += '<button class="btn btn-sm" style="background:#1a0505;color:#ff6b6b;" data-id="' + adId + '" onclick="deleteAd(this.dataset.id)">✕</button>';
+    html += '</div></div>';
+  }
+  el.innerHTML = html;
+}
+
+async function toggleAd(id, isActive) {
+  await db.from('ads').update({is_active: isActive}).eq('id', id);
+  loadAds();
+}
+
+async function deleteAd(id) {
+  if (!confirm('Delete this ad?')) return;
+  await db.from('ads').delete().eq('id', id);
+  loadAds();
+}
+
 const SUPABASE_URL = 'https://aeiosubhurnlwsaqrwwj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFlaW9zdWJodXJubHdzYXFyd3dqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTM3MTczMCwiZXhwIjoyMDk0OTQ3NzMwfQ.Grk6AyAx0mQZ53h4pasa0UWMlaevJXZfhG-UuH8oCJE';
 const RAPIDAPI_KEY = 'edbc52525emsh1c6ae957149a61ap1fe86ejsncf2e57a79043';
 const API_HOST    = 'boxing-data-api.p.rapidapi.com';
 
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  global: {
+    fetch: function(url, options) {
+      return fetch(url, Object.assign({}, options, {credentials: 'omit'}));
+    }
+  }
+});
 let storedEvents = [];
 let allUsers = [];
 let allScorecards = [];
@@ -394,6 +482,7 @@ if (sessionStorage.getItem('rc_admin') === '1') {
 
 // ── TABS ──────────────────────────────────────────────────────
 function showTab(tab) {
+  if (tab === "ads") { setTimeout(loadAds, 50); }
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('panel-' + tab).classList.add('active');
@@ -1074,5 +1163,43 @@ async function banFromReport(userId, username, reportId) {
 // ── INIT ──────────────────────────────────────────────────────
 if (sessionStorage.getItem('rc_admin') === '1') init();
 </script>
+
+<div class="panel" id="panel-ads">
+  <div class="card">
+    <div class="card-header">
+      <div><div class="card-title">📢 Ad Management</div><div class="card-sub">Manage ad placements across the app. Direct-sold only.</div></div>
+      <button class="btn btn-mid btn-sm" onclick="loadAds()">↺ REFRESH</button>
+    </div>
+    <div class="card-body">
+      <div style="background:var(--black);border-radius:12px;padding:16px;margin-bottom:20px;border:0.5px solid #2A2A2F;">
+        <div style="font-size:12px;color:var(--sub);letter-spacing:0.5px;margin-bottom:12px;">NEW AD</div>
+        <div class="form-grid">
+          <div class="field"><label>Advertiser Name</label><input id="adAdvertiser" placeholder="e.g. Bet365"/></div>
+          <div class="field"><label>Placement</label>
+            <select id="adPlacement">
+              <option value="splash">Splash Screen (full screen on app load)</option>
+              <option value="fights_between">Fights Screen (between Live and Upcoming)</option>
+              <option value="post_submit">Post Scorecard Submission</option>
+              <option value="leaderboard">Leaderboard (between top 3 and rest)</option>
+              <option value="fight_detail">Fight Detail (below community scorecard)</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>Image URL</label><input id="adImageUrl" placeholder="https://yourcdn.com/ad-image.jpg"/></div>
+        <div class="field"><label>Link URL (where tapping takes the user)</label><input id="adLinkUrl" placeholder="https://bet365.com/boxing"/></div>
+        <div id="adPreview" style="margin:12px 0;display:none;">
+          <div style="font-size:11px;color:var(--sub);margin-bottom:6px;">PREVIEW</div>
+          <img id="adPreviewImg" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px;border:0.5px solid #2A2A2F;"/>
+        </div>
+        <button class="btn btn-mid btn-sm" onclick="previewAd()" style="margin-right:8px;margin-bottom:8px;">👁 PREVIEW</button>
+        <div id="adMsg"></div>
+        <button class="btn btn-red" onclick="saveAd()" style="width:100%;padding:13px;justify-content:center;margin-top:12px;">ADD AD →</button>
+      </div>
+      <div style="font-size:12px;color:var(--sub);letter-spacing:0.5px;margin-bottom:10px;">ALL ADS</div>
+      <div id="adsList"><div class="empty">No ads yet. Add one above.</div></div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
