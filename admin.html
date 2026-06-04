@@ -130,7 +130,6 @@
   <button class="tab-btn" onclick="showTab('scorecards')">📋 Scorecards</button>
   <button class="tab-btn" onclick="showTab('notifications')">🔔 Notifications</button>
   <button class="tab-btn" onclick="showTab('reports')">🚨 Reports</button>
-  <button class="tab-btn" onclick="showTab('ads')">📢 Ads</button>
 </div>
 
 <!-- ═══════════════════════════════════ -->
@@ -317,6 +316,35 @@
       <button class="btn btn-red" onclick="sendBroadcast()" style="width:100%;padding:13px;justify-content:center;">SEND TO ALL USERS →</button>
     </div>
   </div>
+
+  <!-- Scheduled Notifications -->
+  <div class="card" style="margin-top:16px;">
+    <div class="card-header">
+      <div><div class="card-title">⏰ Scheduled Notification</div><div class="card-sub">Schedule a notification to send at a specific date and time</div></div>
+    </div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="field"><label>Title</label><input id="schedTitle" placeholder="e.g. 🥊 Fight night is here!"/></div>
+        <div class="field"><label>Type</label>
+          <select id="schedType">
+            <option value="announcement">📢 Announcement</option>
+            <option value="fight_live">🔴 Fight Live</option>
+            <option value="feature">⭐ New Feature</option>
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>Message</label><textarea id="schedBody" rows="3" placeholder="Your scheduled message..."></textarea></div>
+      <div class="field"><label>Send At (your local time)</label><input id="schedTime" type="datetime-local"/></div>
+      <div id="schedMsg"></div>
+      <button class="btn btn-mid" onclick="scheduleNotification()" style="width:100%;padding:13px;justify-content:center;margin-bottom:16px;">⏰ SCHEDULE NOTIFICATION →</button>
+
+      <!-- Scheduled list -->
+      <div style="border-top:0.5px solid var(--mid);padding-top:16px;">
+        <div style="font-size:12px;color:var(--sub);letter-spacing:0.5px;margin-bottom:10px;">SCHEDULED</div>
+        <div id="schedList"><div class="empty">No scheduled notifications</div></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════ -->
@@ -330,116 +358,9 @@
     </div>
     <div class="card-body"><div id="reportsList"><div class="empty">Loading...</div></div></div>
   </div>
-
-<div class="panel" id="panel-ads">
-  <div class="card">
-    <div class="card-header">
-      <div><div class="card-title">📢 Ad Management</div><div class="card-sub">Manage ad placements. Direct-sold only.</div></div>
-      <button class="btn btn-mid btn-sm" onclick="loadAds()">REFRESH</button>
-    </div>
-    <div class="card-body">
-      <div style="background:var(--black);border-radius:12px;padding:16px;margin-bottom:20px;border:0.5px solid #2A2A2F;">
-        <div style="font-size:12px;color:var(--sub);letter-spacing:0.5px;margin-bottom:12px;">NEW AD</div>
-        <div class="form-grid">
-          <div class="field"><label>Advertiser</label><input id="adAdvertiser" placeholder="e.g. Bet365"/></div>
-          <div class="field"><label>Placement</label>
-            <select id="adPlacement">
-              <option value="splash">Splash Screen</option>
-              <option value="fights_between">Fights Screen</option>
-              <option value="post_submit">Post Submit</option>
-              <option value="leaderboard">Leaderboard</option>
-              <option value="fight_detail">Fight Detail</option>
-            </select>
-          </div>
-        </div>
-        <div class="field"><label>Image URL</label><input id="adImageUrl" placeholder="https://yourcdn.com/ad.jpg"/></div>
-        <div class="field"><label>Link URL</label><input id="adLinkUrl" placeholder="https://bet365.com"/></div>
-        <div id="adPreview" style="margin:12px 0;display:none;">
-          <img id="adPreviewImg" style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;"/>
-        </div>
-        <button class="btn btn-mid btn-sm" onclick="previewAd()" style="margin-bottom:8px;">PREVIEW</button>
-        <div id="adMsg"></div>
-        <button class="btn btn-red" onclick="saveAd()" style="width:100%;padding:13px;justify-content:center;margin-top:8px;">ADD AD</button>
-      </div>
-      <div style="font-size:12px;color:var(--sub);letter-spacing:0.5px;margin-bottom:10px;">ALL ADS</div>
-      <div id="adsList"><div class="empty">No ads yet</div></div>
-    </div>
-  </div>
-</div>
 </div>
 
 <script>
-
-function previewAd() {
-  var url = document.getElementById('adImageUrl').value.trim();
-  if (!url) { msg('adMsg', 'Enter an image URL first.', 'error'); return; }
-  document.getElementById('adPreviewImg').src = url;
-  document.getElementById('adPreview').style.display = 'block';
-}
-
-async function saveAd() {
-  var advertiser = document.getElementById('adAdvertiser').value.trim();
-  var placement  = document.getElementById('adPlacement').value;
-  var imageUrl   = document.getElementById('adImageUrl').value.trim();
-  var linkUrl    = document.getElementById('adLinkUrl').value.trim();
-  if (!imageUrl) { msg('adMsg', 'Image URL is required.', 'error'); return; }
-  msg('adMsg', 'Saving...', 'info');
-  var res = await db.from('ads').insert({
-    advertiser: advertiser || null,
-    placement: placement,
-    image_url: imageUrl,
-    link_url: linkUrl || null,
-    is_active: true
-  });
-  if (res.error) { msg('adMsg', 'Error: ' + res.error.message, 'error'); return; }
-  msg('adMsg', 'Ad saved!', 'success');
-  document.getElementById('adAdvertiser').value = '';
-  document.getElementById('adImageUrl').value = '';
-  document.getElementById('adLinkUrl').value = '';
-  document.getElementById('adPreview').style.display = 'none';
-  loadAds();
-}
-
-async function loadAds() {
-  var el = document.getElementById('adsList');
-  if (!el) return;
-  var res = await db.from('ads').select('*').order('created_at', {ascending: false});
-  if (!res.data || !res.data.length) { el.innerHTML = '<div class="empty">No ads yet.</div>'; return; }
-  var labels = {splash: 'Splash', fights_between: 'Fights Screen', post_submit: 'Post Submit', leaderboard: 'Leaderboard', fight_detail: 'Fight Detail'};
-  var html = '';
-  res.data.forEach(function(ad) {
-    var label = labels[ad.placement] || ad.placement;
-    var color = ad.is_active ? 'var(--green)' : 'var(--sub)';
-    var status = ad.is_active ? 'LIVE' : 'PAUSED';
-    var chk = ad.is_active ? 'checked' : '';
-    var adId = ad.id;
-    html += '<div class="manage-row" style="align-items:flex-start;gap:12px;">';
-    html += '<img src="' + ad.image_url + '" style="width:80px;height:50px;object-fit:cover;border-radius:6px;flex-shrink:0;"/>';
-    html += '<div style="flex:1;">';
-    html += '<div class="manage-name">' + (ad.advertiser || 'Unnamed') + '</div>';
-    html += '<div class="manage-meta">' + label + '</div>';
-    if (ad.link_url) { html += '<div style="font-size:11px;color:var(--sub);">' + ad.link_url + '</div>'; }
-    html += '</div>';
-    html += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:' + color + ';">';
-    html += '<input type="checkbox" ' + chk + ' onchange="toggleAd(this.dataset.id, this.checked)" data-id="' + adId + '" style="cursor:pointer;"/>' + status;
-    html += '</label>';
-    html += '<button class="btn btn-sm" style="background:#1a0505;color:#ff6b6b;" onclick="deleteAd(this.dataset.id)" data-id="' + adId + '">X</button>';
-    html += '</div>';
-  });
-  el.innerHTML = html;
-}
-
-async function toggleAd(id, isActive) {
-  await db.from('ads').update({is_active: isActive}).eq('id', id);
-  loadAds();
-}
-
-async function deleteAd(id) {
-  if (!confirm('Delete this ad?')) return;
-  await db.from('ads').delete().eq('id', id);
-  loadAds();
-}
-
 const SUPABASE_URL = 'https://aeiosubhurnlwsaqrwwj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFlaW9zdWJodXJubHdzYXFyd3dqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTM3MTczMCwiZXhwIjoyMDk0OTQ3NzMwfQ.Grk6AyAx0mQZ53h4pasa0UWMlaevJXZfhG-UuH8oCJE';
 const RAPIDAPI_KEY = 'edbc52525emsh1c6ae957149a61ap1fe86ejsncf2e57a79043';
@@ -664,7 +585,7 @@ async function loadFights() {
   const el = document.getElementById('fightsList');
   el.innerHTML = '<div class="empty">Loading...</div>';
   const {data, error} = await db.from('fights')
-    .select('*, fighter_a:fighters!fights_fighter_a_id_fkey(name), fighter_b:fighters!fights_fighter_b_id_fkey(name)')
+    .select('*, fighter_a:fighters!fights_fighter_a_id_fkey(name), fighter_b:fighters!fights_fighter_b_id_fkey(name), seed_scorecard_count, seed_split_a, seed_split_b')
     .order('fight_date', {ascending: false}).limit(200);
   if (error || !data?.length) { el.innerHTML = '<div class="empty">No fights yet.</div>'; return; }
 
@@ -711,6 +632,23 @@ async function loadFights() {
           <option value="cancelled">Cancel Fight</option>
         </select>
         <button class="btn btn-sm" style="background:#1a0505;color:#ff6b6b;" onclick="delFight('${f.id}')">✕</button>
+      </div>
+      <!-- Seed data row -->
+      <div style="width:100%;display:flex;align-items:center;gap:8px;padding-top:8px;border-top:0.5px solid #2A2A2F;margin-top:4px;flex-wrap:wrap;">
+        <span style="font-size:11px;color:var(--sub);letter-spacing:0.5px;">SEED DATA</span>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <label style="font-size:11px;color:var(--sub);">Judges:</label>
+          <input id="seed-count-${f.id}" type="number" value="${f.seed_scorecard_count || 0}" min="0" style="background:var(--black);border:0.5px solid #3A3A3F;border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;width:70px;outline:none;"/>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <label style="font-size:11px;color:var(--red);">A%:</label>
+          <input id="seed-split-a-${f.id}" type="number" value="${f.seed_split_a || 0}" min="0" max="100" style="background:var(--black);border:0.5px solid #3A3A3F;border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;width:60px;outline:none;"/>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <label style="font-size:11px;color:var(--blue);">B%:</label>
+          <input id="seed-split-b-${f.id}" type="number" value="${f.seed_split_b || 0}" min="0" max="100" style="background:var(--black);border:0.5px solid #3A3A3F;border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;width:60px;outline:none;"/>
+        </div>
+        <button class="btn btn-mid btn-sm" onclick="saveSeedData('${f.id}')">SAVE SEED</button>
       </div>
     </div>`;
 
@@ -764,6 +702,69 @@ function toggleEventGroup(idx) {
   const toggle = document.getElementById('toggle-' + idx);
   body.classList.toggle('open');
   toggle.classList.toggle('open');
+}
+
+async function saveSeedData(id) {
+  const count = parseInt(document.getElementById('seed-count-' + id)?.value ?? '0');
+  const splitA = parseInt(document.getElementById('seed-split-a-' + id)?.value ?? '0');
+  const splitB = parseInt(document.getElementById('seed-split-b-' + id)?.value ?? '0');
+  const { error } = await db.from('fights').update({
+    seed_scorecard_count: count,
+    seed_split_a: splitA,
+    seed_split_b: splitB,
+  }).eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  // Show brief success feedback
+  const btn = event.target;
+  btn.textContent = '✓ SAVED';
+  btn.style.color = 'var(--green)';
+  setTimeout(() => { btn.textContent = 'SAVE SEED'; btn.style.color = ''; }, 2000);
+}
+
+async function scheduleNotification() {
+  const title = document.getElementById('schedTitle').value.trim();
+  const body  = document.getElementById('schedBody').value.trim();
+  const type  = document.getElementById('schedType').value;
+  const time  = document.getElementById('schedTime').value;
+  if (!title || !body || !time) { msg('schedMsg', 'Please fill in all fields.', 'error'); return; }
+  const sendAt = new Date(time).toISOString();
+  if (new Date(sendAt) < new Date()) { msg('schedMsg', 'Please select a future time.', 'error'); return; }
+  msg('schedMsg', 'Scheduling...', 'info');
+  try {
+    const { error } = await db.from('scheduled_notifications').insert({
+      title, body, type, send_at: sendAt, status: 'pending'
+    });
+    if (error) throw error;
+    msg('schedMsg', '✓ Notification scheduled!', 'success');
+    document.getElementById('schedTitle').value = '';
+    document.getElementById('schedBody').value  = '';
+    document.getElementById('schedTime').value  = '';
+    loadScheduled();
+  } catch(e) { msg('schedMsg', 'Error: ' + e.message, 'error'); }
+}
+
+async function loadScheduled() {
+  const el = document.getElementById('schedList');
+  if (!el) return;
+  const { data } = await db.from('scheduled_notifications')
+    .select('*').order('send_at', { ascending: true }).limit(20);
+  if (!data?.length) { el.innerHTML = '<div class="empty">No scheduled notifications</div>'; return; }
+  el.innerHTML = data.map(n => `
+    <div class="manage-row" style="flex-wrap:wrap;gap:8px;">
+      <div style="flex:1;">
+        <div class="manage-name">${n.title}</div>
+        <div class="manage-meta">${n.body}</div>
+        <div style="font-size:11px;color:var(--sub);margin-top:2px;">📅 ${new Date(n.send_at).toLocaleString()}</div>
+      </div>
+      <span class="status-pill" style="background:${n.status==='sent'?'rgba(34,197,94,0.15)':n.status==='failed'?'rgba(232,0,29,0.15)':'rgba(201,168,76,0.15)'};color:${n.status==='sent'?'var(--green)':n.status==='failed'?'var(--red)':'var(--gold)'};">${n.status.toUpperCase()}</span>
+      ${n.status === 'pending' ? `<button class="btn btn-sm" style="background:#1a0505;color:#ff6b6b;" onclick="deleteScheduled('${n.id}')">✕</button>` : ''}
+    </div>`).join('');
+}
+
+async function deleteScheduled(id) {
+  if (!confirm('Delete this scheduled notification?')) return;
+  await db.from('scheduled_notifications').delete().eq('id', id);
+  loadScheduled();
 }
 
 async function saveResult(id) {
