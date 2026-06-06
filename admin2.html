@@ -861,6 +861,7 @@ async function loadFights() {
         </div>
       </div>`;
   }).join('');
+  setTimeout(populateBroadcasterSelects, 100);
 }
 
 function prefillEventForm(eventName, date, venue) {
