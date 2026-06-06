@@ -126,6 +126,7 @@
 <div class="nav-tabs">
   <button class="tab-btn active" onclick="showTab('fights')">🥊 Fights</button>
   <button class="tab-btn" onclick="showTab('fighters')">👊 Fighters</button>
+  <button class="tab-btn" onclick="showTab('broadcasters')">📺 Broadcasters</button>
   <button class="tab-btn" onclick="showTab('users')">👥 Users</button>
   <button class="tab-btn" onclick="showTab('scorecards')">📋 Scorecards</button>
   <button class="tab-btn" onclick="showTab('notifications')">🔔 Notifications</button>
@@ -179,6 +180,11 @@
             <option>Welterweight</option><option>Super Lightweight</option><option>Lightweight</option>
             <option>Super Featherweight</option><option>Featherweight</option><option>Super Bantamweight</option>
             <option>Bantamweight</option><option>Super Flyweight</option><option>Flyweight</option>
+          </select>
+        </div>
+        <div class="field"><label>Broadcaster</label>
+          <select id="fight-broadcaster">
+            <option value="">None</option>
           </select>
         </div>
         <div class="field"><label>Rounds</label>
@@ -363,6 +369,94 @@
 
 <script>
 
+function previewBcLogo() {
+  var url = document.getElementById('bcLogo').value.trim();
+  var preview = document.getElementById('bcLogoPreview');
+  var img = document.getElementById('bcLogoImg');
+  if (url) { img.src = url; preview.style.display = 'block'; }
+  else { preview.style.display = 'none'; }
+}
+
+async function saveBroadcaster() {
+  var name = document.getElementById('bcName').value.trim();
+  var logo = document.getElementById('bcLogo').value.trim();
+  var website = document.getElementById('bcWebsite').value.trim();
+  if (!name) { msg('bcMsg', 'Name is required.', 'error'); return; }
+  var res = await db.from('broadcasters').insert({ name: name, logo_url: logo || null, website_url: website || null });
+  if (res.error) { msg('bcMsg', 'Error: ' + res.error.message, 'error'); return; }
+  msg('bcMsg', 'Broadcaster saved!', 'success');
+  document.getElementById('bcName').value = '';
+  document.getElementById('bcLogo').value = '';
+  document.getElementById('bcWebsite').value = '';
+  document.getElementById('bcLogoPreview').style.display = 'none';
+  loadBroadcasters();
+  loadBroadcasterDropdown();
+}
+
+async function loadBroadcasters() {
+  var el = document.getElementById('bcList');
+  if (!el) return;
+  var res = await db.from('broadcasters').select('*').order('name');
+  if (!res.data || !res.data.length) { el.innerHTML = '<div class="empty">No broadcasters yet.</div>'; return; }
+  var html = '';
+  res.data.forEach(function(bc) {
+    html += '<div class="manage-row" style="gap:12px;align-items:center;">';
+    if (bc.logo_url) {
+      html += '<img src="' + bc.logo_url + '" style="height:32px;width:80px;object-fit:contain;background:#2A2A2F;padding:4px;border-radius:4px;flex-shrink:0;"/>';
+    }
+    html += '<div style="flex:1;"><div class="manage-name">' + bc.name + '</div>';
+    if (bc.website_url) { html += '<div class="manage-meta">' + bc.website_url + '</div>'; }
+    html += '</div>';
+    html += '<button class="btn btn-sm" style="background:#1a0505;color:#ff6b6b;" data-id="' + bc.id + '" onclick="deleteBroadcaster(this.dataset.id)">X</button>';
+    html += '</div>';
+  });
+  el.innerHTML = html;
+}
+
+async function deleteBroadcaster(id) {
+  if (!confirm('Delete this broadcaster?')) return;
+  await db.from('broadcasters').delete().eq('id', id);
+  loadBroadcasters();
+  loadBroadcasterDropdown();
+}
+
+
+async function assignBroadcaster(fightId, broadcasterId) {
+  var val = broadcasterId || null;
+  var res = await db.from('fights').update({ broadcaster_id: val }).eq('id', fightId);
+  if (res.error) { alert('Error: ' + res.error.message); return; }
+}
+
+async function populateBroadcasterSelects() {
+  var res = await db.from('broadcasters').select('id, name').order('name');
+  if (!res.data || !res.data.length) return;
+  var selects = document.querySelectorAll('[id^="bc-select-"]');
+  selects.forEach(function(sel) {
+    var fightId = sel.id.replace('bc-select-', '');
+    var currentVal = sel.getAttribute('data-current') || '';
+    var opts = '<option value="">📺 Broadcaster...</option>';
+    res.data.forEach(function(bc) {
+      var selected = bc.id === currentVal ? 'selected' : '';
+      opts += '<option value="' + bc.id + '" ' + selected + '>' + bc.name + '</option>';
+    });
+    sel.innerHTML = opts;
+  });
+}
+
+async function loadBroadcasterDropdown() {
+  var sel = document.getElementById('fight-broadcaster');
+  if (!sel) return;
+  var res = await db.from('broadcasters').select('id, name').order('name');
+  var opts = '<option value="">None</option>';
+  if (res.data) {
+    res.data.forEach(function(bc) {
+      opts += '<option value="' + bc.id + '">' + bc.name + '</option>';
+    });
+  }
+  sel.innerHTML = opts;
+}
+
+
 function previewAd() {
   var url = document.getElementById('adImageUrl').value.trim();
   if (!url) { msg('adMsg', 'Enter an image URL first.', 'error'); return; }
@@ -482,6 +576,7 @@ if (sessionStorage.getItem('rc_admin') === '1') {
 
 // ── TABS ──────────────────────────────────────────────────────
 function showTab(tab) {
+  if (tab === 'broadcasters') { setTimeout(loadBroadcasters, 50); }
   if (tab === "ads") { setTimeout(loadAds, 50); }
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -491,6 +586,7 @@ function showTab(tab) {
 
 function init() {
   loadFights();
+  loadBroadcasterDropdown();
   loadFighterPhotos();
   loadUsers();
   loadScorecards();
@@ -591,6 +687,7 @@ async function importEvent(ei) {
   }
   msg('syncMsg', `✓ Imported ${ok} fights${skip ? ` (${skip} skipped)` : ''}.`, 'success');
   loadFights();
+  setTimeout(populateBroadcasterSelects, 500);
 }
 
 // ── FETCH RESULTS ─────────────────────────────────────────────
@@ -713,6 +810,9 @@ async function loadFights() {
           </select>
           <button class="btn btn-red btn-sm" onclick="saveResult('${f.id}')">SAVE</button>
         ` : ''}
+        <select id="bc-select-${f.id}" data-current="${f.broadcaster_id || ''}" onchange="assignBroadcaster('${f.id}', this.value)" style="background:var(--mid);color:var(--text);border:0.5px solid #3A3A3F;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;">
+          <option value="">📺 Broadcaster...</option>
+        </select>
         <select onchange="setStatus('${f.id}', this.value)" style="background:var(--mid);color:var(--text);border:0.5px solid #3A3A3F;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;">
           <option value="">⚡ Override...</option>
           <option value="upcoming">Force Upcoming</option>
@@ -761,6 +861,7 @@ async function loadFights() {
         </div>
       </div>`;
   }).join('');
+  setTimeout(populateBroadcasterSelects, 100);
 }
 
 function prefillEventForm(eventName, date, venue) {
@@ -1195,6 +1296,33 @@ if (sessionStorage.getItem('rc_admin') === '1') init();
       </div>
       <div style="font-size:12px;color:var(--sub);letter-spacing:0.5px;margin-bottom:10px;">ALL ADS</div>
       <div id="adsList"><div class="empty">No ads yet. Add one above.</div></div>
+    </div>
+  </div>
+</div>
+
+
+<div class="panel" id="panel-broadcasters">
+  <div class="card">
+    <div class="card-header">
+      <div><div class="card-title">📺 Broadcasters</div><div class="card-sub">Manage broadcaster logos. Add once, assign to any fight.</div></div>
+      <button class="btn btn-mid btn-sm" onclick="loadBroadcasters()">↺ REFRESH</button>
+    </div>
+    <div class="card-body">
+      <div style="background:var(--black);border-radius:12px;padding:16px;margin-bottom:20px;border:0.5px solid #2A2A2F;">
+        <div style="font-size:12px;color:var(--sub);letter-spacing:0.5px;margin-bottom:12px;">ADD BROADCASTER</div>
+        <div class="form-grid">
+          <div class="field"><label>Name</label><input id="bcName" placeholder="e.g. DAZN"/></div>
+          <div class="field"><label>Website URL (optional)</label><input id="bcWebsite" placeholder="https://dazn.com"/></div>
+        </div>
+        <div class="field"><label>Logo URL</label><input id="bcLogo" placeholder="https://yourcdn.com/dazn-logo.png" oninput="previewBcLogo()"/></div>
+        <div id="bcLogoPreview" style="display:none;margin:8px 0;">
+          <img id="bcLogoImg" style="height:40px;object-fit:contain;background:#2A2A2F;padding:8px;border-radius:6px;"/>
+        </div>
+        <div id="bcMsg"></div>
+        <button class="btn btn-red" onclick="saveBroadcaster()" style="width:100%;padding:13px;justify-content:center;margin-top:12px;">ADD BROADCASTER →</button>
+      </div>
+      <div style="font-size:12px;color:var(--sub);letter-spacing:0.5px;margin-bottom:10px;">ALL BROADCASTERS</div>
+      <div id="bcList"><div class="empty">No broadcasters yet</div></div>
     </div>
   </div>
 </div>
