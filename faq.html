@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FAQ & How To — RoundCard</title>
+<meta name="description" content="Everything you need to know about RoundCard — the boxing scoring app. How to score fights, build your judge profile and compete on the leaderboard.">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --black:#0D0D0F;--red:#E8001D;--gold:#C9A84C;--bone:#F5F0E8;
+  --gray:#1A1A1E;--mid:#2A2A2F;--sub:#9494A0;--blue:#5FA8E8;
+}
+html{scroll-behavior:smooth}
+body{background:var(--black);color:var(--bone);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow-x:hidden}
+
+/* NAV */
+nav{display:flex;align-items:center;justify-content:space-between;padding:18px 48px;border-bottom:0.5px solid var(--mid);position:sticky;top:0;background:rgba(13,13,15,0.92);backdrop-filter:blur(20px);z-index:100}
+.logo{font-size:20px;font-weight:900;letter-spacing:2px;text-decoration:none;color:var(--bone)}
+.logo span{color:var(--red)}
+.nav-links{display:flex;align-items:center;gap:32px}
+.nav-links a{color:var(--sub);text-decoration:none;font-size:14px;font-weight:500;transition:color 0.2s}
+.nav-links a:hover{color:var(--bone)}
+.nav-cta{background:var(--red);color:white;border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;letter-spacing:0.5px}
+
+/* HERO */
+.page-hero{padding:80px 48px 60px;border-bottom:0.5px solid var(--mid);position:relative;overflow:hidden}
+.page-hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 60% 80% at 20% 50%,rgba(232,0,29,0.06) 0%,transparent 70%);pointer-events:none}
+.page-hero-label{display:inline-flex;align-items:center;gap:8px;background:rgba(232,0,29,0.1);border:0.5px solid rgba(232,0,29,0.35);color:var(--red);font-size:11px;font-weight:700;letter-spacing:1.5px;padding:7px 16px;border-radius:20px;margin-bottom:24px}
+.page-hero h1{font-size:clamp(40px,6vw,72px);font-weight:900;line-height:0.95;letter-spacing:-2px;margin-bottom:16px}
+.page-hero h1 span{color:var(--red)}
+.page-hero p{font-size:17px;color:var(--sub);line-height:1.7;max-width:520px}
+
+/* LAYOUT */
+.faq-layout{display:grid;grid-template-columns:260px 1fr;gap:0;max-width:1100px;margin:0 auto;padding:0 48px}
+
+/* SIDEBAR */
+.sidebar{padding:48px 32px 48px 0;position:sticky;top:80px;height:fit-content}
+.sidebar-section{margin-bottom:32px}
+.sidebar-section-title{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--sub);margin-bottom:12px;text-transform:uppercase}
+.sidebar a{display:block;font-size:14px;color:var(--sub);text-decoration:none;padding:6px 0;border-left:2px solid transparent;padding-left:12px;transition:all 0.2s;line-height:1.4}
+.sidebar a:hover{color:var(--bone);border-left-color:var(--red)}
+.sidebar a.active{color:var(--bone);border-left-color:var(--red)}
+
+/* CONTENT */
+.faq-content{padding:48px 0 80px;border-left:0.5px solid var(--mid);padding-left:48px}
+
+.faq-section{margin-bottom:64px}
+.section-anchor{position:relative;top:-100px}
+.section-tag{display:inline-block;background:rgba(232,0,29,0.1);border:0.5px solid rgba(232,0,29,0.3);color:var(--red);font-size:10px;font-weight:700;letter-spacing:1.5px;padding:4px 12px;border-radius:20px;margin-bottom:16px;text-transform:uppercase}
+.section-title{font-size:28px;font-weight:900;letter-spacing:-0.5px;margin-bottom:8px}
+.section-sub{font-size:15px;color:var(--sub);line-height:1.6;margin-bottom:32px}
+
+/* FAQ ITEMS */
+.faq-item{border:0.5px solid var(--mid);border-radius:12px;margin-bottom:10px;overflow:hidden;transition:border-color 0.2s}
+.faq-item:hover{border-color:rgba(232,0,29,0.3)}
+.faq-item.open{border-color:rgba(232,0,29,0.4)}
+.faq-q{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;cursor:pointer;gap:16px}
+.faq-q-text{font-size:15px;font-weight:600;color:var(--bone);line-height:1.4}
+.faq-icon{width:24px;height:24px;border-radius:50%;background:var(--gray);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.2s,transform 0.2s}
+.faq-item.open .faq-icon{background:var(--red);transform:rotate(45deg)}
+.faq-icon svg{width:12px;height:12px;fill:none;stroke:var(--sub);stroke-width:2}
+.faq-item.open .faq-icon svg{stroke:white}
+.faq-a{display:none;padding:0 20px 18px;font-size:14px;color:var(--sub);line-height:1.75}
+.faq-item.open .faq-a{display:block}
+.faq-a strong{color:var(--bone)}
+.faq-a ul{margin:10px 0 10px 16px}
+.faq-a ul li{margin-bottom:6px}
+
+/* HOW TO STEPS */
+.steps{display:flex;flex-direction:column;gap:16px;margin-bottom:32px}
+.step{display:flex;gap:16px;align-items:flex-start}
+.step-num{width:32px;height:32px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:white;flex-shrink:0;margin-top:2px}
+.step-body{flex:1}
+.step-title{font-size:15px;font-weight:700;color:var(--bone);margin-bottom:4px}
+.step-desc{font-size:14px;color:var(--sub);line-height:1.6}
+
+/* TIP BOX */
+.tip-box{background:rgba(201,168,76,0.06);border:0.5px solid rgba(201,168,76,0.3);border-radius:12px;padding:16px 20px;margin:24px 0;display:flex;gap:12px;align-items:flex-start}
+.tip-icon{font-size:18px;flex-shrink:0;margin-top:1px}
+.tip-text{font-size:14px;color:var(--sub);line-height:1.65}
+.tip-text strong{color:var(--gold)}
+
+/* INFO BOX */
+.info-box{background:rgba(95,168,232,0.06);border:0.5px solid rgba(95,168,232,0.25);border-radius:12px;padding:16px 20px;margin:24px 0;display:flex;gap:12px;align-items:flex-start}
+.info-text{font-size:14px;color:var(--sub);line-height:1.65}
+.info-text strong{color:var(--blue)}
+
+/* BADGE TABLE */
+.badge-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:20px 0}
+.badge-card{background:var(--gray);border-radius:10px;padding:14px 16px;border:0.5px solid var(--mid)}
+.badge-emoji{font-size:22px;margin-bottom:6px}
+.badge-name{font-size:13px;font-weight:700;color:var(--bone);margin-bottom:2px}
+.badge-desc{font-size:12px;color:var(--sub);line-height:1.4}
+
+/* TIER TABLE */
+.tier-table{width:100%;border-collapse:collapse;margin:20px 0;font-size:14px}
+.tier-table th{text-align:left;padding:10px 14px;font-size:10px;font-weight:700;letter-spacing:1px;color:var(--sub);border-bottom:0.5px solid var(--mid);text-transform:uppercase}
+.tier-table td{padding:12px 14px;border-bottom:0.5px solid rgba(42,42,47,0.5);color:var(--sub);line-height:1.4}
+.tier-table td:first-child{color:var(--bone);font-weight:600}
+.tier-table tr:last-child td{border-bottom:none}
+
+/* FOOTER */
+footer{border-top:0.5px solid var(--mid);padding:40px 48px;display:flex;align-items:center;justify-content:space-between}
+.footer-logo{font-size:18px;font-weight:900;letter-spacing:2px;color:var(--bone)}
+.footer-logo span{color:var(--red)}
+.footer-sub{font-size:13px;color:var(--sub)}
+
+/* MOBILE */
+@media(max-width:768px){
+  nav{padding:16px 20px}
+  .nav-links{display:none}
+  .page-hero{padding:60px 20px 40px}
+  .faq-layout{grid-template-columns:1fr;padding:0 20px}
+  .sidebar{display:none}
+  .faq-content{border-left:none;padding-left:0;padding-top:32px}
+  footer{padding:24px 20px;flex-direction:column;gap:8px;text-align:center}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo">ROUND<span>CARD</span></a>
+  <div class="nav-links">
+    <a href="/#features">Features</a>
+    <a href="/faq.html" style="color:var(--bone)">FAQ</a>
+    <a href="https://apps.apple.com/app/roundcard/id6772762759" class="nav-cta">Download</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<div class="page-hero">
+  <div class="page-hero-bg"></div>
+  <div class="page-hero-label">🥊 Help Centre</div>
+  <h1>FAQ & <span>How To</span></h1>
+  <p>Everything you need to know about scoring fights, building your judge profile and competing on the leaderboard.</p>
+</div>
+
+<div class="faq-layout">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Getting Started</div>
+      <a href="#getting-started">Download & Sign Up</a>
+      <a href="#guest-mode">Guest Mode</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Scoring</div>
+      <a href="#how-to-score">How to Score a Fight</a>
+      <a href="#scoring-system">The 10-Point Must System</a>
+      <a href="#consensus">Community Consensus</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Your Profile</div>
+      <a href="#accuracy">Accuracy & Rating</a>
+      <a href="#badges">Badges & Tiers</a>
+      <a href="#leaderboard">Leaderboard</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Features</div>
+      <a href="#sharing">Sharing Scorecards</a>
+      <a href="#social">Following & Community</a>
+      <a href="#notifications">Notifications</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">General</div>
+      <a href="#faq-general">Common Questions</a>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="faq-content">
+
+    <!-- GETTING STARTED -->
+    <div class="faq-section">
+      <div class="section-anchor" id="getting-started"></div>
+      <div class="section-tag">Getting Started</div>
+      <div class="section-title">Download & Sign Up</div>
+      <div class="section-sub">RoundCard is free to download on iOS and Android. Get started in under a minute.</div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-title">Download the app</div>
+            <div class="step-desc">Search for RoundCard on the App Store or Google Play, or use the download button at the top of this page.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-title">Create a free account</div>
+            <div class="step-desc">Enter your username, email and password. Your username is how other judges will find and follow you.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <div class="step-title">Find a fight and start scoring</div>
+            <div class="step-desc">Tap the Fights tab to see live and upcoming fights. Tap Score Now on any fight to begin.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <div class="step-title">Submit your scorecard</div>
+            <div class="step-desc">After the final round, tap Submit Scorecard to share your scores with the community and see how you compared.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GUEST MODE -->
+    <div class="faq-section">
+      <div class="section-anchor" id="guest-mode"></div>
+      <div class="section-tag">Getting Started</div>
+      <div class="section-title">Guest Mode</div>
+      <div class="section-sub">Try RoundCard before creating an account.</div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">Can I try the app without creating an account?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">Yes — tap <strong>Continue as Guest</strong> on the login screen. You can browse all fights, view live community scoring and score a full fight round by round without an account.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">What happens to my scorecard if I create an account after scoring as a guest?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">Your scorecard is saved and transferred automatically to your new account when you sign up. You won't lose any of your scoring data.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">What can't I do as a guest?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">Guest accounts cannot submit scorecards, share scorecards, follow other judges, view your profile or appear on the leaderboard. Create a free account to unlock everything.</div>
+      </div>
+    </div>
+
+    <!-- HOW TO SCORE -->
+    <div class="faq-section">
+      <div class="section-anchor" id="how-to-score"></div>
+      <div class="section-tag">Scoring</div>
+      <div class="section-title">How to Score a Fight</div>
+      <div class="section-sub">Score alongside the pros, round by round, in real time.</div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-title">Open a live or upcoming fight</div>
+            <div class="step-desc">Tap the Fights tab and press Score Now on any live fight. You can also score upcoming fights in advance.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-title">Score each round</div>
+            <div class="step-desc">Use the + and − buttons to set the score for each fighter. The default is 10-9. Adjust up or down based on what you see.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <div class="step-title">Lock the round</div>
+            <div class="step-desc">Tap Lock Round to confirm your scores and move to the next round. After locking, you'll see how the community scored that round.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <div class="step-title">End the fight</div>
+            <div class="step-desc">After all rounds are complete — or if the fight is stopped early — tap Submit Scorecard. Your card is shared with the community and your accuracy is tracked.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tip-box">
+        <div class="tip-icon">💡</div>
+        <div class="tip-text"><strong>Tip:</strong> If a fight ends early by KO, TKO or stoppage, tap End Fight Early before submitting. Your scorecard will reflect the rounds that were fought.</div>
+      </div>
+    </div>
+
+    <!-- SCORING SYSTEM -->
+    <div class="faq-section">
+      <div class="section-anchor" id="scoring-system"></div>
+      <div class="section-tag">Scoring</div>
+      <div class="section-title">The 10-Point Must System</div>
+      <div class="section-sub">The same system used by professional judges worldwide.</div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">How does the 10-point must system work?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">
+          The winner of each round receives 10 points. The loser receives 9 or fewer. A standard competitive round is scored <strong>10-9</strong>. Here's a guide:<br/><br/>
+          <ul>
+            <li><strong>10-9</strong> — close round, one fighter edges it</li>
+            <li><strong>10-8</strong> — dominant round, knockdown or heavy damage</li>
+            <li><strong>10-7</strong> — extremely rare, multiple knockdowns or total domination</li>
+            <li><strong>10-10</strong> — even round (very rare)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">How do knockdowns affect the score?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">
+          Each knockdown costs the floored fighter one point. So a round with one knockdown is typically scored <strong>10-8</strong>. Two knockdowns in the same round is usually <strong>10-7</strong>. The knockdown itself doesn't automatically determine the score — if the fighter who was knocked down dominated the rest of the round, the judge can still score it 10-8 rather than 10-7.<br/><br/>
+          In RoundCard, tap the <strong>−</strong> button on a fighter's score if they were knocked down to reflect the point deduction.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">What are point deductions?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">
+          A referee can deduct a point from a fighter for deliberate fouls — low blows, headbutts, hitting on the break, biting or repeated holding. A deduction costs that fighter one point from their round score, separate from knockdowns.<br/><br/>
+          For example, if Fighter A wins the round 10-9 but receives a deduction, it becomes <strong>9-9</strong>. Use the <strong>−</strong> button in RoundCard to apply a deduction to the correct fighter's score.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">Can you give me a scoring example?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">
+          Here's how a 12-round fight might be scored:<br/><br/>
+          <strong>Rounds 1, 3, 4, 6, 8, 11, 12</strong> — Fighter A edges it. Score: <strong>10-9</strong><br/>
+          <strong>Rounds 2, 5, 7, 10</strong> — Fighter B edges it. Score: <strong>9-10</strong><br/>
+          <strong>Round 9</strong> — Fighter A knocks down Fighter B. Score: <strong>10-8</strong><br/><br/>
+          Final tally:<br/>
+          Fighter A: 7 × 10 + 4 × 9 + 1 × 10 = <strong>116</strong><br/>
+          Fighter B: 7 × 9 + 4 × 10 + 1 × 8 = <strong>111</strong><br/><br/>
+          Result: <strong>Fighter A wins 116–111</strong> on your scorecard.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">What should I consider when scoring a round?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">Professional judges score based on four criteria in order of importance:<br/><br/>
+          <ul>
+            <li><strong>Clean punching</strong> — hard, clean shots that land with force</li>
+            <li><strong>Effective aggression</strong> — moving forward with purpose, not just wading in</li>
+            <li><strong>Ring generalship</strong> — controlling the pace, distance and position</li>
+            <li><strong>Defence</strong> — avoiding shots, making the opponent miss</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">Can I change my score after locking a round?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">No — once a round is locked, the score is final. This keeps things authentic and mirrors what real judges do. You can withdraw your entire scorecard from the Cards tab if you want to start again.</div>
+      </div>
+    </div>
+
+    <!-- CONSENSUS -->
+    <div class="faq-section">
+      <div class="section-anchor" id="consensus"></div>
+      <div class="section-tag">Scoring</div>
+      <div class="section-title">Community Consensus</div>
+      <div class="section-sub">See how thousands of judges are scoring the same fight.</div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">What is the community consensus?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">After locking each round, RoundCard shows you how the rest of the community scored that same round — what percentage had Fighter A winning, Fighter B winning, or scored it even. It's a snapshot of real-time collective scoring.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">When does the community consensus appear?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">The consensus popup appears automatically after you lock each round. You can also tap the gold button at any time to bring it back up for any previously locked round.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">What does the live scoring feed show on the Fights screen?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">For live fights, the Fights screen shows a real-time feed of how judges are scoring each round, the running community average score and a split bar showing who the community has winning overall.</div>
+      </div>
+    </div>
+
+    <!-- ACCURACY -->
+    <div class="faq-section">
+      <div class="section-anchor" id="accuracy"></div>
+      <div class="section-tag">Your Profile</div>
+      <div class="section-title">Accuracy & Rating</div>
+      <div class="section-sub">Track how your judging compares to the official result.</div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">How is accuracy calculated?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">Accuracy measures how often your scorecard correctly predicted the winner of a fight that went to the judges' scorecards. If you had Fighter A winning and Fighter A won by decision, that counts as correct. Fights that end by KO, TKO or stoppage do not count towards accuracy.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">Why isn't my accuracy showing yet?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">Accuracy only updates when an official result is entered for a fight you scored that went to a decision. If you've only scored fights that ended early or whose results haven't been entered yet, your accuracy will show as — until then.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">What is Average Rating?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">Other judges can rate your scorecard after you submit it. Your average rating is the mean score across all ratings you've received, shown out of 5. A high rating means the community respects your judging.</div>
+      </div>
+    </div>
+
+    <!-- BADGES -->
+    <div class="faq-section">
+      <div class="section-anchor" id="badges"></div>
+      <div class="section-tag">Your Profile</div>
+      <div class="section-title">Badges & Tiers</div>
+      <div class="section-sub">Earn badges and climb through judge tiers as your experience grows.</div>
+
+      <div class="badge-grid">
+        <div class="badge-card">
+          <div class="badge-emoji">🥊</div>
+          <div class="badge-name">First Blood</div>
+          <div class="badge-desc">Submit your first scorecard</div>
+        </div>
+        <div class="badge-card">
+          <div class="badge-emoji">🔟</div>
+          <div class="badge-name">Ten Deep</div>
+          <div class="badge-desc">Submit 10 scorecards</div>
+        </div>
+        <div class="badge-card">
+          <div class="badge-emoji">🔥</div>
+          <div class="badge-name">On Fire</div>
+          <div class="badge-desc">Score fights 3 weeks in a row</div>
+        </div>
+        <div class="badge-card">
+          <div class="badge-emoji">🎯</div>
+          <div class="badge-name">Sharp Judge</div>
+          <div class="badge-desc">Accuracy above 80%</div>
+        </div>
+        <div class="badge-card">
+          <div class="badge-emoji">💯</div>
+          <div class="badge-name">Century</div>
+          <div class="badge-desc">Submit 100 scorecards</div>
+        </div>
+        <div class="badge-card">
+          <div class="badge-emoji">👑</div>
+          <div class="badge-name">Master Judge</div>
+          <div class="badge-desc">200+ scorecards, 90%+ accuracy</div>
+        </div>
+      </div>
+
+      <div class="section-title" style="font-size:20px;margin:32px 0 8px">Judge Tiers</div>
+      <table class="tier-table">
+        <thead>
+          <tr>
+            <th>Tier</th>
+            <th>Requirements</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>🏅 Newcomer</td><td>Getting started — score your first fights</td></tr>
+          <tr><td>⚖️ Club Judge</td><td>5+ scorecards submitted</td></tr>
+          <tr><td>🥊 Regional Judge</td><td>20+ scorecards, 70%+ accuracy</td></tr>
+          <tr><td>⭐ Senior Judge</td><td>50+ scorecards, 80%+ accuracy</td></tr>
+          <tr><td>🏆 Elite Judge</td><td>100+ scorecards, 85%+ accuracy, 4.0+ rating</td></tr>
+          <tr><td>👑 Master Judge</td><td>200+ scorecards, 90%+ accuracy, 4.5+ rating</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- LEADERBOARD -->
+    <div class="faq-section">
+      <div class="section-anchor" id="leaderboard"></div>
+      <div class="section-tag">Your Profile</div>
+      <div class="section-title">Leaderboard</div>
+      <div class="section-sub">Compete against judges from around the world.</div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">How are leaderboard points calculated?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">You earn points for every submitted scorecard, with bonuses for accuracy, ratings received from other judges and consecutive weeks of scoring. The more consistently you judge, the higher you climb.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">Why am I not showing on the leaderboard?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">You must have at least one submitted scorecard to appear on the leaderboard. Make sure you've tapped Submit Scorecard after completing a fight — scorecards in progress don't count.</div>
+      </div>
+    </div>
+
+    <!-- SHARING -->
+    <div class="faq-section">
+      <div class="section-anchor" id="sharing"></div>
+      <div class="section-tag">Features</div>
+      <div class="section-title">Sharing Scorecards</div>
+      <div class="section-sub">Share your scores with the boxing world.</div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">How do I share my scorecard?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">After submitting a scorecard, go to the Cards tab, find your scorecard and tap the Share button. RoundCard generates a branded image showing your round-by-round scores, the community split and the official result. Share it directly to Instagram, WhatsApp, X and more.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">Can I share my judge profile?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">Yes — go to your Profile tab and tap the Share button at the top. This shares a message with your username and a link to download RoundCard, so others can find and follow you.</div>
+      </div>
+    </div>
+
+    <!-- SOCIAL -->
+    <div class="faq-section">
+      <div class="section-anchor" id="social"></div>
+      <div class="section-tag">Features</div>
+      <div class="section-title">Following & Community</div>
+      <div class="section-sub">Build your network of boxing judges.</div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">How do I follow another judge?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">Tap on any judge's name or avatar to open their profile, then tap Follow. Their submitted scorecards will appear in your Following feed on the Cards tab.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">How do I find other judges to follow?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">Use the search icon on the Fights screen to search by username. You can also discover judges through the leaderboard on the Ranks tab, or by tapping on scorers in the live scoring feed.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">Can I comment on scorecards?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">Yes — tap on any scorecard in the Cards tab or on another judge's profile to open the scorecard detail view. From there you can leave a comment or reply to existing comments.</div>
+      </div>
+    </div>
+
+    <!-- NOTIFICATIONS -->
+    <div class="faq-section">
+      <div class="section-anchor" id="notifications"></div>
+      <div class="section-tag">Features</div>
+      <div class="section-title">Notifications</div>
+      <div class="section-sub">Stay up to date with your scoring activity.</div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">What notifications does RoundCard send?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">RoundCard notifies you when:
+          <ul style="margin-top:8px">
+            <li>Someone follows you</li>
+            <li>Someone comments on your scorecard</li>
+            <li>Someone replies to your comment</li>
+            <li>Someone rates your scorecard</li>
+            <li>A fight you set a reminder for is about to go live</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">How do I set a reminder for a fight?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">On the Fights screen, tap the bell icon on any upcoming fight card. You'll receive a push notification when the fight is about to go live so you don't miss it.</div>
+      </div>
+    </div>
+
+    <!-- GENERAL FAQ -->
+    <div class="faq-section">
+      <div class="section-anchor" id="faq-general"></div>
+      <div class="section-tag">General</div>
+      <div class="section-title">Common Questions</div>
+      <div class="section-sub">Anything else you need to know.</div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">Is RoundCard free?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">Yes — RoundCard is completely free to download and use. All core features including scoring fights, viewing community consensus, sharing scorecards and the leaderboard are free.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">Which fights are available to score?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">RoundCard covers major professional boxing events worldwide including Matchroom Boxing, Queensberry Promotions, Top Rank and more. Fights are added regularly ahead of major cards.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">Can I score fights after they've happened?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">Recently completed fights remain available to score for a short period. Once a fight moves to the completed section you can see the community scorecard and official result even if you didn't score it live.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">How do I withdraw a scorecard?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">Go to the Cards tab, find your scorecard and tap Withdraw. This removes your scorecard from the community feed and allows you to score the fight again if you want to change your scores.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">How do I delete my account?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">Go to Profile → Edit Profile → Delete Account. This will permanently remove your account and all your scorecards from RoundCard. This action cannot be undone.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggle(this)">
+          <span class="faq-q-text">I found a bug or have a suggestion — how do I get in touch?</span>
+          <div class="faq-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+        <div class="faq-a">We'd love to hear from you. Reach out on <strong>X @roundcardapp</strong> or email <strong>wayne@made-simple.uk</strong>. We read everything.</div>
+      </div>
+
+      <div class="info-box">
+        <div class="tip-icon">📲</div>
+        <div class="info-text"><strong>Still need help?</strong> Drop us a message on X <strong>@roundcardapp</strong> and we'll get back to you.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<footer>
+  <div class="footer-logo">ROUND<span>CARD</span></div>
+  <div class="footer-sub">Score it. Own it. Defend it.</div>
+</footer>
+
+<script>
+function toggle(el) {
+  const item = el.closest('.faq-item');
+  item.classList.toggle('open');
+}
+
+// Highlight active sidebar link on scroll
+const sections = document.querySelectorAll('.section-anchor');
+const links = document.querySelectorAll('.sidebar a');
+
+window.addEventListener('scroll', () => {
+  let current = '';
+  sections.forEach(s => {
+    if (window.scrollY >= s.offsetTop - 120) current = s.id;
+  });
+  links.forEach(a => {
+    a.classList.remove('active');
+    if (a.getAttribute('href') === '#' + current) a.classList.add('active');
+  });
+});
+</script>
+
+</body>
+</html>
