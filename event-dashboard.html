@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RoundCard Live Event Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --black:#0D0D0F;--red:#E8001D;--gold:#C9A84C;--bone:#F5F0E8;
+  --gray:#1A1A1E;--mid:#2A2A2F;--sub:#9494A0;--blue:#5FA8E8;
+  --green:#22C55E;
+}
+body{background:var(--black);color:var(--bone);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+
+/* LOGIN */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.login-card{background:var(--gray);border:0.5px solid var(--mid);border-radius:20px;padding:48px 40px;width:100%;max-width:420px;text-align:center}
+.login-logo{font-size:28px;font-weight:900;letter-spacing:2px;margin-bottom:8px}
+.login-logo span{color:var(--red)}
+.login-sub{font-size:14px;color:var(--sub);margin-bottom:32px}
+.login-label{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--sub);text-align:left;display:block;margin-bottom:8px;text-transform:uppercase}
+.login-input{width:100%;background:var(--black);border:0.5px solid var(--mid);border-radius:10px;padding:14px 16px;color:var(--bone);font-size:15px;outline:none;margin-bottom:16px;transition:border-color 0.2s}
+.login-input:focus{border-color:var(--red)}
+.login-btn{width:100%;background:var(--red);border:none;border-radius:10px;padding:14px;color:white;font-size:15px;font-weight:700;letter-spacing:0.5px;cursor:pointer;transition:opacity 0.2s}
+.login-btn:hover{opacity:0.85}
+.login-error{color:var(--red);font-size:13px;margin-top:10px;display:none}
+
+/* APP */
+#app{display:none}
+
+/* HEADER */
+.dash-header{padding:20px 32px;border-bottom:0.5px solid var(--mid);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:rgba(13,13,15,0.95);backdrop-filter:blur(20px);z-index:100}
+.dash-logo{font-size:18px;font-weight:900;letter-spacing:2px}
+.dash-logo span{color:var(--red)}
+.dash-event{text-align:center}
+.dash-event-name{font-size:16px;font-weight:700;color:var(--bone)}
+.dash-event-date{font-size:12px;color:var(--sub);margin-top:2px}
+.live-pill{display:flex;align-items:center;gap:6px;background:rgba(232,0,29,0.1);border:0.5px solid rgba(232,0,29,0.4);border-radius:20px;padding:6px 14px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--red);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.live-txt{font-size:12px;font-weight:700;color:var(--red);letter-spacing:0.5px}
+
+/* STATS BAR */
+.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--mid);border-bottom:0.5px solid var(--mid)}
+.stat-box{background:var(--gray);padding:20px 24px;text-align:center}
+.stat-num{font-size:32px;font-weight:900;color:var(--bone);line-height:1;margin-bottom:4px}
+.stat-num span{color:var(--red)}
+.stat-label{font-size:11px;font-weight:600;color:var(--sub);letter-spacing:0.8px;text-transform:uppercase}
+
+/* FIGHTS GRID */
+.fights-container{padding:32px;max-width:1400px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(580px,1fr));gap:20px}
+
+/* FIGHT CARD */
+.fight-card{background:var(--gray);border:0.5px solid var(--mid);border-radius:16px;overflow:hidden;transition:border-color 0.3s}
+.fight-card.has-data{border-color:rgba(232,0,29,0.25)}
+.fight-card-header{padding:14px 20px;border-bottom:0.5px solid var(--mid);display:flex;align-items:center;justify-content:space-between}
+.fight-weight{font-size:11px;font-weight:700;color:var(--sub);letter-spacing:1px;text-transform:uppercase}
+.fight-status-pill{font-size:10px;font-weight:700;padding:4px 10px;border-radius:10px;letter-spacing:0.5px}
+.status-live{background:rgba(232,0,29,0.15);color:var(--red);border:0.5px solid rgba(232,0,29,0.4)}
+.status-upcoming{background:rgba(148,148,160,0.1);color:var(--sub)}
+.status-completed{background:rgba(34,197,94,0.1);color:var(--green);border:0.5px solid rgba(34,197,94,0.3)}
+
+/* FIGHTERS */
+.fighters-row{display:flex;align-items:center;padding:20px;gap:12px}
+.fighter{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+.fighter-photo{width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid var(--mid)}
+.fighter-photo-a{border-color:var(--red)}
+.fighter-photo-b{border-color:var(--blue)}
+.fighter-placeholder{width:56px;height:56px;border-radius:50%;background:var(--mid);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;border:2px solid var(--mid)}
+.fighter-placeholder-a{border-color:var(--red);color:var(--red)}
+.fighter-placeholder-b{border-color:var(--blue);color:var(--blue)}
+.fighter-name{font-size:14px;font-weight:700;color:var(--bone)}
+.fighter-record{font-size:11px;color:var(--sub)}
+.fighter-score{font-size:40px;font-weight:900;line-height:1}
+.score-a{color:var(--red)}
+.score-b{color:var(--blue)}
+.vs-col{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0}
+.vs-txt{font-size:13px;font-weight:700;color:var(--sub)}
+.fight-rounds{font-size:11px;color:var(--sub)}
+
+/* CONSENSUS */
+.consensus-section{padding:0 20px 16px}
+.consensus-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.consensus-label{font-size:10px;font-weight:700;color:var(--sub);letter-spacing:1px;text-transform:uppercase}
+.consensus-count{font-size:12px;color:var(--sub)}
+.consensus-bar-track{height:28px;border-radius:8px;overflow:hidden;background:var(--mid);display:flex;position:relative}
+.consensus-bar-a{background:var(--red);height:100%;transition:width 0.5s ease;display:flex;align-items:center;justify-content:flex-start;padding-left:10px;min-width:0}
+.consensus-bar-b{background:var(--blue);height:100%;transition:width 0.5s ease;display:flex;align-items:center;justify-content:flex-end;padding-right:10px;min-width:0}
+.consensus-bar-label{font-size:11px;font-weight:700;color:white;white-space:nowrap}
+.consensus-even{background:var(--gold);height:100%;flex:1;display:flex;align-items:center;justify-content:center}
+.consensus-pct{display:flex;justify-content:space-between;margin-top:6px}
+.pct-a{font-size:13px;font-weight:700;color:var(--red)}
+.pct-b{font-size:13px;font-weight:700;color:var(--blue)}
+.pct-draw{font-size:13px;font-weight:700;color:var(--gold)}
+
+/* ROUNDS BREAKDOWN */
+.rounds-section{padding:0 20px 20px}
+.rounds-label{font-size:10px;font-weight:700;color:var(--sub);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
+.rounds-grid{display:flex;flex-wrap:wrap;gap:4px}
+.round-dot{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;background:var(--mid);color:var(--sub);position:relative}
+.round-dot.won-a{background:rgba(232,0,29,0.2);color:var(--red);border:0.5px solid rgba(232,0,29,0.4)}
+.round-dot.won-b{background:rgba(95,168,232,0.2);color:var(--blue);border:0.5px solid rgba(95,168,232,0.4)}
+.round-dot.even{background:rgba(201,168,76,0.15);color:var(--gold);border:0.5px solid rgba(201,168,76,0.3)}
+.round-wrap{display:flex;flex-direction:column;align-items:center;gap:2px}
+.round-score-lbl{font-size:9px;color:var(--sub);font-weight:600;white-space:nowrap}
+
+/* OFFICIAL RESULT */
+.official-result{margin:0 20px 16px;background:rgba(34,197,94,0.08);border:0.5px solid rgba(34,197,94,0.3);border-radius:8px;padding:10px 14px;text-align:center}
+.official-result-txt{font-size:13px;font-weight:700;color:var(--green);letter-spacing:0.5px}
+
+/* SCORECARD TABLE */
+.scorecard-table-section{padding:0 20px 20px}
+.scorecard-table-label{font-size:10px;font-weight:700;color:var(--sub);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px}
+.scorecard-table{width:100%;border-collapse:collapse;font-size:13px}
+.scorecard-table th{padding:8px 6px;text-align:center;font-size:10px;font-weight:700;color:var(--sub);letter-spacing:0.5px;border-bottom:0.5px solid var(--mid);min-width:28px}
+.scorecard-table th:first-child{text-align:left;padding-left:0;min-width:80px}
+.scorecard-table td{padding:8px 6px;text-align:center;font-size:13px;font-weight:700;border-bottom:0.5px solid rgba(42,42,47,0.4)}
+.scorecard-table td:first-child{text-align:left;padding-left:0;font-size:12px;color:var(--sub);font-weight:600}
+.scorecard-table tr:last-child td{border-bottom:none}
+.scorecard-table td.won-a{background:rgba(232,0,29,0.12);color:var(--red);border-radius:4px}
+.scorecard-table td.won-b{background:rgba(95,168,232,0.12);color:var(--blue);border-radius:4px}
+.scorecard-table td.empty{color:var(--mid)}
+.scorecard-table .total-col{font-size:15px;font-weight:900;border-left:0.5px solid var(--mid);padding-left:10px}
+.total-a{color:var(--red)}
+.total-b{color:var(--blue)}
+
+/* NO DATA */
+.no-data{padding:32px 20px;text-align:center}
+.no-data-txt{font-size:13px;color:var(--sub)}
+
+/* FOOTER */
+.dash-footer{text-align:center;padding:32px;border-top:0.5px solid var(--mid);font-size:12px;color:var(--sub)}
+.dash-footer strong{color:var(--bone)}
+
+/* REFRESH INDICATOR */
+.refresh-bar{height:2px;background:var(--mid);position:fixed;bottom:0;left:0;right:0;z-index:200}
+.refresh-progress{height:100%;background:var(--red);width:0%;transition:width linear}
+
+@media(max-width:768px){
+  .stats-bar{grid-template-columns:repeat(2,1fr)}
+  .fights-container{grid-template-columns:1fr;padding:16px}
+  .dash-header{padding:14px 16px}
+  .dash-event{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">ROUND<span>CARD</span></div>
+    <div class="login-sub">Live Event Dashboard</div>
+    <label class="login-label">Event Password</label>
+    <input class="login-input" type="password" id="pw-input" placeholder="Enter password" onkeydown="if(event.key==='Enter')login()"/>
+    <button class="login-btn" onclick="login()">VIEW DASHBOARD →</button>
+    <div class="login-error" id="login-error">Incorrect password</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="dash-header">
+    <div class="dash-logo">ROUND<span>CARD</span></div>
+    <div class="dash-event">
+      <div class="dash-event-name" id="event-name-header">Loading...</div>
+      <div class="dash-event-date" id="event-date-header"></div>
+    </div>
+    <div class="live-pill">
+      <div class="live-dot"></div>
+      <div class="live-txt">LIVE</div>
+    </div>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat-box">
+      <div class="stat-num" id="total-scorecards">0</div>
+      <div class="stat-label">Total Scorecards</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" id="total-judges">0</div>
+      <div class="stat-label">Unique Judges</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" id="most-scored-fight">—</div>
+      <div class="stat-label">Most Scored Fight</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" id="total-fights">0</div>
+      <div class="stat-label">Fights on Card</div>
+    </div>
+  </div>
+
+  <div class="fights-container" id="fights-container"></div>
+
+  <div class="dash-footer">
+    Powered by <strong>RoundCard</strong> · roundcard.app · Refreshes every 5 seconds
+  </div>
+</div>
+
+<div class="refresh-bar"><div class="refresh-progress" id="refresh-progress"></div></div>
+
+<script>
+const SUPABASE_URL = 'https://aeiosubhurnlwsaqrwwj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFlaW9zdWJodXJubHdzYXFyd3dqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNzE3MzAsImV4cCI6MjA5NDk0NzczMH0.N2aN4NOzRpiCtEYhiagyPHjac2Jyj4aDskQLxLz_7cM';
+
+// ── CONFIGURE PER EVENT ──────────────────────────────────────────
+const EVENT_NAME     = 'Top Tier Boxing';   // Must match event_name in fights table exactly
+const EVENT_PASSWORD = 'toptier2026';       // Change per event
+const EVENT_DATE     = 'July 2026';
+// ────────────────────────────────────────────────────────────────
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  global: { fetch: (url, opts) => fetch(url, Object.assign({}, opts, { credentials: 'omit' })) }
+});
+
+function login() {
+  var pw = document.getElementById('pw-input').value;
+  if (pw === EVENT_PASSWORD) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('event-name-header').textContent = EVENT_NAME;
+    document.getElementById('event-date-header').textContent = EVENT_DATE;
+    loadDashboard();
+    startRefreshCycle();
+  } else {
+    document.getElementById('login-error').style.display = 'block';
+    document.getElementById('pw-input').value = '';
+  }
+}
+
+var fightData = {};
+
+async function loadDashboard() {
+  try {
+    // Fetch all fights for this event
+    var fightsRes = await db
+      .from('fights_with_status')
+      .select('*, fighter_a:fighters!fights_fighter_a_id_fkey(*), fighter_b:fighters!fights_fighter_b_id_fkey(*), broadcaster:broadcasters(name, logo_url)')
+      .eq('event_name', EVENT_NAME)
+      .order('fight_date', { ascending: true });
+
+    if (!fightsRes.data || !fightsRes.data.length) {
+      document.getElementById('fights-container').innerHTML = '<div style="padding:64px;text-align:center;color:var(--sub);grid-column:1/-1">No fights found for this event.</div>';
+      return;
+    }
+
+    var fights = fightsRes.data;
+    document.getElementById('total-fights').textContent = fights.length;
+
+    // Fetch scorecards and rounds for all fights in one go
+    var fightIds = fights.map(function(f) { return f.id; });
+
+    var scorecardsRes = await db
+      .from('scorecards')
+      .select('id, fight_id, user_id, total_a, total_b, rounds(round_number, score_a, score_b)')
+      .in('fight_id', fightIds);
+
+    var allScorecards = scorecardsRes.data || [];
+
+    // Group scorecards by fight
+    var scorecardsByFight = {};
+    fightIds.forEach(function(id) { scorecardsByFight[id] = []; });
+    allScorecards.forEach(function(sc) {
+      if (scorecardsByFight[sc.fight_id]) scorecardsByFight[sc.fight_id].push(sc);
+    });
+
+    // Calculate totals
+    var totalScorecards = allScorecards.length;
+    var uniqueJudges    = new Set(allScorecards.map(function(s) { return s.user_id; })).size;
+
+    // Most scored fight
+    var mostScored = fights.reduce(function(best, f) {
+      var count = scorecardsByFight[f.id]?.length || 0;
+      return count > (best.count || 0) ? { name: f.fighter_a.name.split(' ').pop() + ' vs ' + f.fighter_b.name.split(' ').pop(), count: count } : best;
+    }, {});
+
+    document.getElementById('total-scorecards').textContent = totalScorecards;
+    document.getElementById('total-judges').textContent     = uniqueJudges;
+    document.getElementById('most-scored-fight').textContent = mostScored.name || '—';
+    document.getElementById('most-scored-fight').style.fontSize = '16px';
+
+    // Render fight cards
+    renderFights(fights, scorecardsByFight);
+
+  } catch(e) { console.error('Dashboard error:', e); }
+}
+
+function renderFights(fights, scorecardsByFight) {
+  var container = document.getElementById('fights-container');
+  var html = '';
+
+  fights.forEach(function(fight) {
+    var cards    = scorecardsByFight[fight.id] || [];
+    var fAname   = fight.fighter_a?.name || 'Fighter A';
+    var fBname   = fight.fighter_b?.name || 'Fighter B';
+    var fAshort  = fAname.split(' ').pop().toUpperCase();
+    var fBshort  = fBname.split(' ').pop().toUpperCase();
+    var fAphoto  = fight.fighter_a?.avatar_url;
+    var fBphoto  = fight.fighter_b?.avatar_url;
+    var fArecord = fight.fighter_a?.record || '';
+    var fBrecord = fight.fighter_b?.record || '';
+    var status   = fight.auto_status || fight.status;
+    var hasData  = cards.length > 0;
+
+    // Status pill
+    var statusHtml = '';
+    if (status === 'live') statusHtml = '<span class="fight-status-pill status-live">● LIVE</span>';
+    else if (status === 'completed') statusHtml = '<span class="fight-status-pill status-completed">✓ COMPLETED</span>';
+    else statusHtml = '<span class="fight-status-pill status-upcoming">UPCOMING</span>';
+
+    // Calculate consensus from rounds (works for both live and completed)
+    var totalA = 0, totalB = 0, cardCount = 0;
+    var roundTotals = {}; // round_number -> {a, b, count}
+
+    cards.forEach(function(card) {
+      var rA = 0, rB = 0;
+      if (card.rounds && card.rounds.length > 0) {
+        card.rounds.forEach(function(r) {
+          rA += r.score_a;
+          rB += r.score_b;
+          if (!roundTotals[r.round_number]) roundTotals[r.round_number] = {a:0, b:0, count:0};
+          roundTotals[r.round_number].a += r.score_a;
+          roundTotals[r.round_number].b += r.score_b;
+          roundTotals[r.round_number].count++;
+        });
+        totalA += rA;
+        totalB += rB;
+        cardCount++;
+      } else if (card.total_a != null) {
+        totalA += card.total_a;
+        totalB += card.total_b;
+        cardCount++;
+      }
+    });
+
+    var avgA = cardCount > 0 ? Math.round(totalA / cardCount) : 0;
+    var avgB = cardCount > 0 ? Math.round(totalB / cardCount) : 0;
+
+    // Win percentages
+    var aWins = cards.filter(function(c) {
+      var ca = c.total_a || (c.rounds || []).reduce(function(s,r){return s+r.score_a},0);
+      var cb = c.total_b || (c.rounds || []).reduce(function(s,r){return s+r.score_b},0);
+      return ca > cb;
+    }).length;
+    var bWins = cards.filter(function(c) {
+      var ca = c.total_a || (c.rounds || []).reduce(function(s,r){return s+r.score_a},0);
+      var cb = c.total_b || (c.rounds || []).reduce(function(s,r){return s+r.score_b},0);
+      return cb > ca;
+    }).length;
+    var draws = cards.length - aWins - bWins;
+    var total = cards.length;
+    var aPct  = total > 0 ? Math.round(aWins / total * 100) : 0;
+    var bPct  = total > 0 ? Math.round(bWins / total * 100) : 0;
+    var dPct  = total > 0 ? Math.round(draws / total * 100) : 0;
+
+    // Fighter photos
+    var photoA = fAphoto
+      ? '<img src="' + fAphoto + '" class="fighter-photo fighter-photo-a" onerror="this.style.display=\'none\'"/>'
+      : '<div class="fighter-placeholder fighter-placeholder-a">' + fAshort[0] + '</div>';
+    var photoB = fBphoto
+      ? '<img src="' + fBphoto + '" class="fighter-photo fighter-photo-b" onerror="this.style.display=\'none\'"/>'
+      : '<div class="fighter-placeholder fighter-placeholder-b">' + fBshort[0] + '</div>';
+
+    // Consensus bar
+    var barHtml = '';
+    if (!hasData) {
+      barHtml = '<div class="consensus-bar-track"><div style="flex:1;display:flex;align-items:center;justify-content:center;"><span style="font-size:12px;color:var(--sub)">No scores yet</span></div></div>';
+    } else if (aPct === 0 && bPct === 0) {
+      barHtml = '<div class="consensus-bar-track"><div class="consensus-even"><span class="consensus-bar-label">ALL EVEN</span></div></div>';
+    } else {
+      barHtml = '<div class="consensus-bar-track">';
+      if (aPct > 0) barHtml += '<div class="consensus-bar-a" style="width:' + aPct + '%"><span class="consensus-bar-label">' + (aPct > 15 ? fAshort + ' ' + aPct + '%' : '') + '</span></div>';
+      if (bPct > 0) barHtml += '<div class="consensus-bar-b" style="width:' + bPct + '%"><span class="consensus-bar-label">' + (bPct > 15 ? bPct + '% ' + fBshort : '') + '</span></div>';
+      barHtml += '</div>';
+    }
+
+    // Rounds breakdown
+    var roundKeys = Object.keys(roundTotals).sort(function(a,b){return a-b});
+    var roundsHtml = '';
+    if (roundKeys.length > 0) {
+      roundKeys.forEach(function(rn) {
+        var rt = roundTotals[rn];
+        var avgRa = rt.a / rt.count;
+        var avgRb = rt.b / rt.count;
+        var cls = avgRa > avgRb ? 'won-a' : avgRb > avgRa ? 'won-b' : 'even';
+        roundsHtml += '<div class="round-dot ' + cls + '">' + rn + '</div>';
+      });
+    }
+
+    // Official result
+    var officialHtml = '';
+    if (fight.result_winner) {
+      officialHtml = '<div class="official-result"><div class="official-result-txt">✓ OFFICIAL: ' + fight.result_winner.toUpperCase() + (fight.result_method ? ' · ' + fight.result_method : '') + '</div></div>';
+    }
+
+    html += '<div class="fight-card ' + (hasData ? 'has-data' : '') + '">';
+    html += '<div class="fight-card-header"><span class="fight-weight">' + (fight.weight_class || '') + '</span>' + statusHtml + '</div>';
+    html += '<div class="fighters-row">';
+    html += '<div class="fighter">' + photoA + '<div class="fighter-name">' + fAname + '</div>' + (fArecord ? '<div class="fighter-record">' + fArecord + '</div>' : '') + '<div class="fighter-score score-a">' + (hasData ? avgA : '—') + '</div></div>';
+    html += '<div class="vs-col"><div class="vs-txt">VS</div><div class="fight-rounds">' + (fight.scheduled_rounds || 12) + 'R</div></div>';
+    html += '<div class="fighter">' + photoB + '<div class="fighter-name">' + fBname + '</div>' + (fBrecord ? '<div class="fighter-record">' + fBrecord + '</div>' : '') + '<div class="fighter-score score-b">' + (hasData ? avgB : '—') + '</div></div>';
+    html += '</div>';
+    html += officialHtml;
+    html += '<div class="consensus-section">';
+    html += '<div class="consensus-header"><span class="consensus-label">Community Consensus</span><span class="consensus-count">' + total + ' judge' + (total !== 1 ? 's' : '') + '</span></div>';
+    html += barHtml;
+    if (hasData && total > 0) {
+      html += '<div class="consensus-pct"><span class="pct-a">' + fAshort + ' ' + aPct + '%</span>';
+      if (dPct > 0) html += '<span class="pct-draw">Draw ' + dPct + '%</span>';
+      html += '<span class="pct-b">' + bPct + '% ' + fBshort + '</span></div>';
+    }
+    html += '</div>';
+    if (roundKeys.length > 0) {
+      var tableHtml = '<div class="scorecard-table-section">';
+      tableHtml += '<div class="scorecard-table-label">Viewers\' Verdict · Round by Round Average</div>';
+      tableHtml += '<div style="overflow-x:auto"><table class="scorecard-table"><thead><tr><th></th>';
+      for (var ri = 0; ri < fight.scheduled_rounds; ri++) {
+        tableHtml += '<th>R' + (ri+1) + '</th>';
+      }
+      tableHtml += '<th style="border-left:0.5px solid var(--mid);padding-left:10px">AVG</th></tr></thead><tbody>';
+
+      // Fighter A row
+      tableHtml += '<tr><td>' + fAshort + '</td>';
+      var tA = 0, tAcount = 0;
+      for (var ri = 1; ri <= fight.scheduled_rounds; ri++) {
+        var rt = roundTotals[ri];
+        if (rt) {
+          var avgA = rt.a / rt.count;
+          var avgB = rt.b / rt.count;
+          var cls = avgA > avgB ? 'won-a' : '';
+          var disp = Number.isInteger(avgA) ? avgA : avgA.toFixed(1);
+          tableHtml += '<td class="' + cls + '">' + disp + '</td>';
+          tA += avgA; tAcount++;
+        } else {
+          tableHtml += '<td class="empty">—</td>';
+        }
+      }
+      var avgTotalA = tAcount > 0 ? Math.round(tA) : '—';
+      tableHtml += '<td class="total-col total-a">' + avgTotalA + '</td></tr>';
+
+      // Fighter B row
+      tableHtml += '<tr><td>' + fBshort + '</td>';
+      var tB = 0, tBcount = 0;
+      for (var ri = 1; ri <= fight.scheduled_rounds; ri++) {
+        var rt = roundTotals[ri];
+        if (rt) {
+          var avgA = rt.a / rt.count;
+          var avgB = rt.b / rt.count;
+          var cls = avgB > avgA ? 'won-b' : '';
+          var disp = Number.isInteger(avgB) ? avgB : avgB.toFixed(1);
+          tableHtml += '<td class="' + cls + '">' + disp + '</td>';
+          tB += avgB; tBcount++;
+        } else {
+          tableHtml += '<td class="empty">—</td>';
+        }
+      }
+      var avgTotalB = tBcount > 0 ? Math.round(tB) : '—';
+      tableHtml += '<td class="total-col total-b">' + avgTotalB + '</td></tr>';
+
+      tableHtml += '</tbody></table></div></div>';
+      html += tableHtml;
+    } else if (!hasData) {
+      html += '<div class="no-data"><div class="no-data-txt">Waiting for judges to score this fight...</div></div>';
+    }
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
+}
+
+// Refresh every 5 seconds with animated progress bar
+var REFRESH_INTERVAL = 5000;
+function startRefreshCycle() {
+  var bar = document.getElementById('refresh-progress');
+  var start = null;
+
+  function animate(ts) {
+    if (!start) start = ts;
+    var progress = Math.min((ts - start) / REFRESH_INTERVAL * 100, 100);
+    bar.style.width = progress + '%';
+    bar.style.transition = 'none';
+    if (progress < 100) {
+      requestAnimationFrame(animate);
+    } else {
+      loadDashboard();
+      start = null;
+      requestAnimationFrame(animate);
+    }
+  }
+  requestAnimationFrame(animate);
+}
+</script>
+</body>
+</html>

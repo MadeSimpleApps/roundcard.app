@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RoundCard Live Event Dashboard — Demo</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --black:#0D0D0F;--red:#E8001D;--gold:#C9A84C;--bone:#F5F0E8;
+  --gray:#1A1A1E;--mid:#2A2A2F;--sub:#9494A0;--blue:#5FA8E8;--green:#22C55E;
+}
+body{background:var(--black);color:var(--bone);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+
+/* LOGIN */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.login-card{background:var(--gray);border:0.5px solid var(--mid);border-radius:20px;padding:48px 40px;width:100%;max-width:420px;text-align:center}
+.login-logo{font-size:28px;font-weight:900;letter-spacing:2px;margin-bottom:8px}
+.login-logo span{color:var(--red)}
+.login-sub{font-size:14px;color:var(--sub);margin-bottom:4px}
+.login-demo-badge{display:inline-block;background:rgba(201,168,76,0.15);border:0.5px solid rgba(201,168,76,0.4);color:var(--gold);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;margin-bottom:28px;letter-spacing:0.5px}
+.login-label{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--sub);text-align:left;display:block;margin-bottom:8px;text-transform:uppercase}
+.login-input{width:100%;background:var(--black);border:0.5px solid var(--mid);border-radius:10px;padding:14px 16px;color:var(--bone);font-size:15px;outline:none;margin-bottom:16px;transition:border-color 0.2s}
+.login-input:focus{border-color:var(--red)}
+.login-btn{width:100%;background:var(--red);border:none;border-radius:10px;padding:14px;color:white;font-size:15px;font-weight:700;letter-spacing:0.5px;cursor:pointer;transition:opacity 0.2s}
+.login-btn:hover{opacity:0.85}
+.login-hint{font-size:12px;color:var(--sub);margin-top:12px}
+.login-hint strong{color:var(--gold)}
+.login-error{color:var(--red);font-size:13px;margin-top:10px;display:none}
+
+/* APP */
+#app{display:none}
+.dash-header{padding:20px 32px;border-bottom:0.5px solid var(--mid);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:rgba(13,13,15,0.95);backdrop-filter:blur(20px);z-index:100}
+.dash-logo{font-size:18px;font-weight:900;letter-spacing:2px}
+.dash-logo span{color:var(--red)}
+.dash-event{text-align:center}
+.dash-event-name{font-size:16px;font-weight:700}
+.dash-event-date{font-size:12px;color:var(--sub);margin-top:2px}
+.live-pill{display:flex;align-items:center;gap:6px;background:rgba(232,0,29,0.1);border:0.5px solid rgba(232,0,29,0.4);border-radius:20px;padding:6px 14px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--red);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.live-txt{font-size:12px;font-weight:700;color:var(--red);letter-spacing:0.5px}
+.demo-banner{background:rgba(201,168,76,0.08);border-bottom:0.5px solid rgba(201,168,76,0.25);padding:10px 32px;text-align:center;font-size:12px;color:var(--gold)}
+
+.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--mid);border-bottom:0.5px solid var(--mid)}
+.stat-box{background:var(--gray);padding:20px 24px;text-align:center}
+.stat-num{font-size:32px;font-weight:900;color:var(--bone);line-height:1;margin-bottom:4px}
+.stat-label{font-size:11px;font-weight:600;color:var(--sub);letter-spacing:0.8px;text-transform:uppercase}
+
+.fights-container{padding:32px;max-width:1400px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(560px,1fr));gap:20px}
+
+.fight-card{background:var(--gray);border:0.5px solid var(--mid);border-radius:16px;overflow:hidden}
+.fight-card.has-data{border-color:rgba(232,0,29,0.25)}
+.fight-card-header{padding:14px 20px;border-bottom:0.5px solid var(--mid);display:flex;align-items:center;justify-content:space-between}
+.fight-weight{font-size:11px;font-weight:700;color:var(--sub);letter-spacing:1px;text-transform:uppercase}
+.fight-status-pill{font-size:10px;font-weight:700;padding:4px 10px;border-radius:10px;letter-spacing:0.5px}
+.status-live{background:rgba(232,0,29,0.15);color:var(--red);border:0.5px solid rgba(232,0,29,0.4)}
+.status-upcoming{background:rgba(148,148,160,0.1);color:var(--sub)}
+.status-completed{background:rgba(34,197,94,0.1);color:var(--green);border:0.5px solid rgba(34,197,94,0.3)}
+
+.fighters-row{display:flex;align-items:center;padding:20px;gap:12px}
+.fighter{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+.fighter-placeholder{width:56px;height:56px;border-radius:50%;background:var(--mid);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;border:2px solid var(--mid)}
+.fighter-placeholder-a{border-color:var(--red);color:var(--red)}
+.fighter-placeholder-b{border-color:var(--blue);color:var(--blue)}
+.fighter-name{font-size:14px;font-weight:700}
+.fighter-record{font-size:11px;color:var(--sub)}
+.fighter-score{font-size:40px;font-weight:900;line-height:1}
+.score-a{color:var(--red)}
+.score-b{color:var(--blue)}
+.vs-col{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0}
+.vs-txt{font-size:13px;font-weight:700;color:var(--sub)}
+.fight-rounds-txt{font-size:11px;color:var(--sub)}
+
+.consensus-section{padding:0 20px 16px}
+.consensus-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.consensus-label{font-size:10px;font-weight:700;color:var(--sub);letter-spacing:1px;text-transform:uppercase}
+.consensus-count{font-size:12px;color:var(--sub)}
+.consensus-bar-track{height:28px;border-radius:8px;overflow:hidden;background:var(--mid);display:flex}
+.bar-a{height:100%;display:flex;align-items:center;padding-left:10px}
+.bar-b{height:100%;display:flex;align-items:center;justify-content:flex-end;padding-right:10px}
+.bar-label{font-size:11px;font-weight:700;color:white;white-space:nowrap}
+.consensus-pct{display:flex;justify-content:space-between;margin-top:6px}
+.pct-a{font-size:13px;font-weight:700;color:var(--red)}
+.pct-b{font-size:13px;font-weight:700;color:var(--blue)}
+
+.rounds-section{padding:0 20px 20px}
+.rounds-label{font-size:10px;font-weight:700;color:var(--sub);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
+.rounds-grid{display:flex;flex-wrap:wrap;gap:4px}
+.round-dot{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+.rd-a{background:rgba(232,0,29,0.2);color:var(--red);border:0.5px solid rgba(232,0,29,0.4)}
+.rd-b{background:rgba(95,168,232,0.2);color:var(--blue);border:0.5px solid rgba(95,168,232,0.4)}
+.rd-e{background:rgba(201,168,76,0.15);color:var(--gold);border:0.5px solid rgba(201,168,76,0.3)}
+.rd-u{background:var(--mid);color:var(--sub)}
+.round-wrap{display:flex;flex-direction:column;align-items:center;gap:2px}
+.round-score-lbl{font-size:9px;color:var(--sub);font-weight:600;white-space:nowrap}
+
+.official-result{margin:0 20px 16px;background:rgba(34,197,94,0.08);border:0.5px solid rgba(34,197,94,0.3);border-radius:8px;padding:10px 14px;text-align:center}
+.official-result-txt{font-size:13px;font-weight:700;color:var(--green);letter-spacing:0.5px}
+.no-data{padding:24px 20px;text-align:center;color:var(--sub);font-size:13px}
+
+.dash-footer{text-align:center;padding:32px;border-top:0.5px solid var(--mid);font-size:12px;color:var(--sub)}
+
+/* SCORECARD TABLE */
+.scorecard-table-section{padding:0 20px 20px}
+.scorecard-table-label{font-size:10px;font-weight:700;color:var(--sub);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px}
+.scorecard-table{width:100%;border-collapse:collapse;font-size:13px}
+.scorecard-table th{padding:8px 6px;text-align:center;font-size:10px;font-weight:700;color:var(--sub);letter-spacing:0.5px;border-bottom:0.5px solid var(--mid);min-width:28px}
+.scorecard-table th:first-child{text-align:left;padding-left:0;min-width:80px}
+.scorecard-table td{padding:8px 6px;text-align:center;font-size:13px;font-weight:700;border-bottom:0.5px solid rgba(42,42,47,0.4)}
+.scorecard-table td:first-child{text-align:left;padding-left:0;font-size:12px;color:var(--sub);font-weight:600}
+.scorecard-table tr:last-child td{border-bottom:none}
+.scorecard-table td.won{background:rgba(232,0,29,0.12);color:var(--red);border-radius:4px}
+.scorecard-table td.won-b{background:rgba(95,168,232,0.12);color:var(--blue);border-radius:4px}
+.scorecard-table td.kd{background:rgba(232,0,29,0.25);color:var(--red)}
+.scorecard-table td.empty{color:var(--mid)}
+.scorecard-table .total-col{font-size:15px;font-weight:900;border-left:0.5px solid var(--mid);padding-left:10px}
+.total-a{color:var(--red)}
+.total-b{color:var(--blue)}
+.refresh-bar{height:2px;background:var(--mid);position:fixed;bottom:0;left:0;right:0;z-index:200}
+.refresh-progress{height:100%;background:var(--red);width:0%}
+
+@media(max-width:768px){
+  .stats-bar{grid-template-columns:repeat(2,1fr)}
+  .fights-container{grid-template-columns:1fr;padding:16px}
+  .dash-header{padding:14px 16px}
+  .dash-event{display:none}
+}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">ROUND<span>CARD</span></div>
+    <div class="login-sub">Live Event Dashboard</div>
+    <div class="login-demo-badge">⭐ DEMO VERSION</div>
+    <label class="login-label">Event Password</label>
+    <input class="login-input" type="password" id="pw-input" placeholder="Enter password" onkeydown="if(event.key==='Enter')login()"/>
+    <button class="login-btn" onclick="login()">VIEW DASHBOARD →</button>
+    <div class="login-hint">Demo password: <strong>demo2026</strong></div>
+    <div class="login-error" id="login-error">Incorrect password</div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="demo-banner">⭐ DEMO — This is how your live event dashboard will look on fight night</div>
+  <div class="dash-header">
+    <div class="dash-logo">ROUND<span>CARD</span></div>
+    <div class="dash-event">
+      <div class="dash-event-name">Top Tier Boxing — Fight Night</div>
+      <div class="dash-event-date">Saturday 12 July 2026 · DAZN</div>
+    </div>
+    <div class="live-pill">
+      <div class="live-dot"></div>
+      <div class="live-txt">LIVE</div>
+    </div>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat-box">
+      <div class="stat-num" id="stat-scorecards">0</div>
+      <div class="stat-label">Total Scorecards</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" id="stat-judges">0</div>
+      <div class="stat-label">Unique Judges</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" id="stat-most" style="font-size:16px;line-height:1.2">—</div>
+      <div class="stat-label">Most Scored Fight</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num">4</div>
+      <div class="stat-label">Fights on Card</div>
+    </div>
+  </div>
+
+  <div class="fights-container" id="fights-container"></div>
+
+  <div class="dash-footer">
+    Powered by <strong>RoundCard</strong> · roundcard.app · Refreshes every 5 seconds
+  </div>
+</div>
+
+<div class="refresh-bar"><div class="refresh-progress" id="refresh-progress"></div></div>
+
+<script>
+var DEMO_FIGHTS = [
+  {
+    id: 1,
+    weight: 'HEAVYWEIGHT · MAIN EVENT',
+    fa: 'Tyson Fury', fb: 'Oleksandr Usyk',
+    fa_short: 'FURY', fb_short: 'USYK',
+    fa_record: '34-0-1', fb_record: '24-0',
+    rounds: 12,
+    status: 'live',
+    scorecards: 847,
+    avg_a: 94, avg_b: 96,
+    a_pct: 38, b_pct: 58, d_pct: 4,
+    round_data: [{w:'b',a:9,b:10},{w:'a',a:10,b:9},{w:'b',a:9,b:10},{w:'b',a:9,b:10},{w:'a',a:10,b:9},{w:'b',a:9,b:10},{w:'a',a:10,b:9},{w:'b',a:9,b:10},{w:'b',a:9,b:10},{w:'a',a:10,b:9},{w:null,a:null,b:null},{w:null,a:null,b:null}],
+    result: null,
+  },
+  {
+    id: 2,
+    weight: 'SUPER MIDDLEWEIGHT',
+    fa: 'Chris Billam-Smith', fb: 'Callum Smith',
+    fa_short: 'CBS', fb_short: 'SMITH',
+    fa_record: '20-3', fb_record: '29-3',
+    rounds: 12,
+    status: 'completed',
+    scorecards: 412,
+    avg_a: 117, avg_b: 111,
+    a_pct: 73, b_pct: 22, d_pct: 5,
+    round_data: [{w:'a',a:10,b:9},{w:'b',a:9,b:10},{w:'a',a:10,b:9},{w:'a',a:10,b:9},{w:'a',a:10,b:9},{w:'b',a:9,b:10},{w:'a',a:10,b:9},{w:'a',a:10,b:9},{w:'b',a:9,b:10},{w:'a',a:10,b:9},{w:'a',a:10,b:9},{w:'a',a:10,b:9}],
+    result: 'BILLAM-SMITH WINS · UD (117-111)',
+  },
+  {
+    id: 3,
+    weight: 'LIGHTWEIGHT',
+    fa: 'Josh Padley', fb: 'Aqib Fiaz',
+    fa_short: 'PADLEY', fb_short: 'FIAZ',
+    fa_record: '14-0', fb_record: '18-1',
+    rounds: 10,
+    status: 'completed',
+    scorecards: 289,
+    avg_a: 97, avg_b: 93,
+    a_pct: 65, b_pct: 30, d_pct: 5,
+    round_data: [{w:'a',a:10,b:9},{w:'a',a:10,b:9},{w:'b',a:9,b:10},{w:'a',a:10,b:9},{w:'a',a:10,b:9},{w:'b',a:9,b:10},{w:'a',a:10,b:9},{w:'a',a:10,b:9},{w:'b',a:9,b:10},{w:'a',a:10,b:9}],
+    result: 'PADLEY WINS · SD (97-93)',
+  },
+  {
+    id: 4,
+    weight: 'WELTERWEIGHT',
+    fa: 'Conor Benn', fb: 'Chris Eubank Jr',
+    fa_short: 'BENN', fb_short: 'EUBANK',
+    fa_record: '22-0', fb_record: '34-3',
+    rounds: 12,
+    status: 'upcoming',
+    scorecards: 0,
+    avg_a: 0, avg_b: 0,
+    a_pct: 0, b_pct: 0, d_pct: 0,
+    round_data: [],
+    result: null,
+  }
+];
+
+var tickIndex = 0;
+var simulatedScores = [847, 412, 289, 0];
+var simulatedJudges = [724, 389, 251, 0];
+
+function login() {
+  var pw = document.getElementById('pw-input').value;
+  if (pw === 'demo2026') {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    renderAll();
+    startRefresh();
+  } else {
+    document.getElementById('login-error').style.display = 'block';
+    document.getElementById('pw-input').value = '';
+  }
+}
+
+function renderAll() {
+  // Simulate live growth on main event
+  DEMO_FIGHTS[0].scorecards = 847 + (tickIndex * 3);
+  simulatedJudges[0] = 731 + (tickIndex * 2);
+
+  var totalScorecards = DEMO_FIGHTS.reduce(function(s,f){return s+f.scorecards},0);
+  var totalJudges = simulatedJudges.reduce(function(s,j){return s+j},0);
+
+  document.getElementById('stat-scorecards').textContent = totalScorecards.toLocaleString();
+  document.getElementById('stat-judges').textContent = totalJudges.toLocaleString();
+  document.getElementById('stat-most').textContent = 'Fury vs Usyk';
+
+  var html = '';
+  DEMO_FIGHTS.forEach(function(f) {
+    var hasData = f.scorecards > 0;
+    var statusHtml = '';
+    if (f.status === 'live') statusHtml = '<span class="fight-status-pill status-live">● LIVE</span>';
+    else if (f.status === 'completed') statusHtml = '<span class="fight-status-pill status-completed">✓ COMPLETED</span>';
+    else statusHtml = '<span class="fight-status-pill status-upcoming">UPCOMING</span>';
+
+    var barHtml = '';
+    if (!hasData) {
+      barHtml = '<div class="consensus-bar-track"><div style="flex:1;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--sub)">No scores yet — fight not started</div></div>';
+    } else {
+      barHtml = '<div class="consensus-bar-track">';
+      if (f.a_pct > 0) barHtml += '<div class="bar-a" style="width:' + f.a_pct + '%;background:var(--red)"><span class="bar-label">' + (f.a_pct > 12 ? f.fa_short + ' ' + f.a_pct + '%' : '') + '</span></div>';
+      if (f.b_pct > 0) barHtml += '<div class="bar-b" style="width:' + f.b_pct + '%;background:var(--blue)"><span class="bar-label">' + (f.b_pct > 12 ? f.b_pct + '% ' + f.fb_short : '') + '</span></div>';
+      barHtml += '</div>';
+    }
+
+    var roundsHtml = '';
+    if (f.round_data.length > 0) {
+      for (var i = 0; i < f.rounds; i++) {
+        var rd = f.round_data[i];
+        var w = rd ? rd.w : null;
+        var cls = w === 'a' ? 'rd-a' : w === 'b' ? 'rd-b' : w === 'e' ? 'rd-e' : 'rd-u';
+        var scoreLbl = (rd && rd.a !== null) ? '<div class="round-score-lbl">' + rd.a + '-' + rd.b + '</div>' : '<div class="round-score-lbl">&nbsp;</div>';
+        roundsHtml += '<div class="round-wrap"><div class="round-dot ' + cls + '">' + (i+1) + '</div>' + scoreLbl + '</div>';
+      }
+    }
+
+    var officialHtml = f.result ? '<div class="official-result"><div class="official-result-txt">✓ OFFICIAL: ' + f.result + '</div></div>' : '';
+
+    html += '<div class="fight-card ' + (hasData ? 'has-data' : '') + '">';
+    html += '<div class="fight-card-header"><span class="fight-weight">' + f.weight + '</span>' + statusHtml + '</div>';
+    html += '<div class="fighters-row">';
+    html += '<div class="fighter"><div class="fighter-placeholder fighter-placeholder-a">' + f.fa_short[0] + '</div><div class="fighter-name">' + f.fa + '</div><div class="fighter-record">' + f.fa_record + '</div><div class="fighter-score score-a">' + (hasData ? f.avg_a : '—') + '</div></div>';
+    html += '<div class="vs-col"><div class="vs-txt">VS</div><div class="fight-rounds-txt">' + f.rounds + 'R</div></div>';
+    html += '<div class="fighter"><div class="fighter-placeholder fighter-placeholder-b">' + f.fb_short[0] + '</div><div class="fighter-name">' + f.fb + '</div><div class="fighter-record">' + f.fb_record + '</div><div class="fighter-score score-b">' + (hasData ? f.avg_b : '—') + '</div></div>';
+    html += '</div>';
+    html += officialHtml;
+    html += '<div class="consensus-section"><div class="consensus-header"><span class="consensus-label">Community Consensus</span><span class="consensus-count">' + f.scorecards.toLocaleString() + ' judges</span></div>';
+    html += barHtml;
+    if (hasData) html += '<div class="consensus-pct"><span class="pct-a">' + f.fa_short + ' ' + f.a_pct + '%</span><span class="pct-b">' + f.b_pct + '% ' + f.fb_short + '</span></div>';
+    html += '</div>';
+    if (f.round_data.length > 0 && hasData) {
+      // Broadcast-style scorecard table
+      var tableHtml = '<div class="scorecard-table-section">';
+      tableHtml += '<div class="scorecard-table-label">Viewers\' Verdict · Round by Round Average</div>';
+      tableHtml += '<div style="overflow-x:auto"><table class="scorecard-table"><thead><tr><th></th>';
+      for (var i = 0; i < f.rounds; i++) {
+        tableHtml += '<th>R' + (i+1) + '</th>';
+      }
+      tableHtml += '<th style="border-left:0.5px solid var(--mid);padding-left:10px">TOTAL</th></tr></thead><tbody>';
+
+      // Fighter A row
+      tableHtml += '<tr><td>' + f.fa_short + '</td>';
+      var totalA = 0;
+      for (var i = 0; i < f.rounds; i++) {
+        var rd = f.round_data[i];
+        if (rd && rd.a !== null) {
+          totalA += rd.a;
+          var cls = rd.w === 'a' ? 'won' : '';
+          tableHtml += '<td class="' + cls + '">' + rd.a + '</td>';
+        } else {
+          tableHtml += '<td class="empty">—</td>';
+        }
+      }
+      tableHtml += '<td class="total-col total-a">' + (totalA > 0 ? totalA : '—') + '</td></tr>';
+
+      // Fighter B row
+      tableHtml += '<tr><td>' + f.fb_short + '</td>';
+      var totalB = 0;
+      for (var i = 0; i < f.rounds; i++) {
+        var rd = f.round_data[i];
+        if (rd && rd.b !== null) {
+          totalB += rd.b;
+          var cls = rd.w === 'b' ? 'won-b' : '';
+          tableHtml += '<td class="' + cls + '">' + rd.b + '</td>';
+        } else {
+          tableHtml += '<td class="empty">—</td>';
+        }
+      }
+      tableHtml += '<td class="total-col total-b">' + (totalB > 0 ? totalB : '—') + '</td></tr>';
+
+      tableHtml += '</tbody></table></div></div>';
+      html += tableHtml;
+    } else if (!hasData) {
+      html += '<div class="no-data">Waiting for judges to score this fight...</div>';
+    }
+    html += '</div>';
+  });
+  document.getElementById('fights-container').innerHTML = html;
+  tickIndex++;
+}
+
+function startRefresh() {
+  var bar = document.getElementById('refresh-progress');
+  var INTERVAL = 5000;
+  var start = null;
+  function animate(ts) {
+    if (!start) start = ts;
+    var p = Math.min((ts - start) / INTERVAL * 100, 100);
+    bar.style.width = p + '%';
+    if (p >= 100) { renderAll(); start = ts; }
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+}
+</script>
+</body>
+</html>
