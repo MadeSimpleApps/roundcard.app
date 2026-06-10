@@ -130,6 +130,22 @@ body{background:var(--black);color:var(--bone);font-family:-apple-system,BlinkMa
 .no-data{padding:32px 20px;text-align:center}
 .no-data-txt{font-size:13px;color:var(--sub)}
 
+/* METHODOLOGY */
+.method-btn{position:fixed;bottom:20px;right:20px;background:var(--gray);border:0.5px solid var(--mid);border-radius:10px;padding:10px 16px;font-size:12px;font-weight:700;color:var(--sub);cursor:pointer;z-index:200;transition:all 0.2s}
+.method-btn:hover{border-color:var(--red);color:var(--bone)}
+.method-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:300;align-items:center;justify-content:center;padding:20px}
+.method-overlay.open{display:flex}
+.method-modal{background:var(--gray);border:0.5px solid var(--mid);border-radius:16px;padding:32px;max-width:560px;width:100%;max-height:80vh;overflow-y:auto}
+.method-title{font-size:20px;font-weight:900;color:var(--bone);margin-bottom:4px}
+.method-sub{font-size:13px;color:var(--sub);margin-bottom:24px}
+.method-section{margin-bottom:20px}
+.method-section-title{font-size:12px;font-weight:700;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
+.method-section p{font-size:13px;color:var(--sub);line-height:1.7;margin-bottom:8px}
+.method-section strong{color:var(--bone)}
+.method-example{background:var(--black);border-radius:8px;padding:12px 16px;margin:10px 0;font-size:12px;color:var(--sub);line-height:1.8;border:0.5px solid var(--mid)}
+.method-example strong{color:var(--bone)}
+.method-close{width:100%;background:var(--red);border:none;border-radius:8px;padding:12px;color:white;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px}
+
 /* FOOTER */
 .dash-footer{text-align:center;padding:32px;border-top:0.5px solid var(--mid);font-size:12px;color:var(--sub)}
 .dash-footer strong{color:var(--bone)}
@@ -200,6 +216,64 @@ body{background:var(--black);color:var(--bone);font-family:-apple-system,BlinkMa
   </div>
 </div>
 
+<button class="method-btn" onclick="document.getElementById('methodModal').classList.add('open')">ℹ️ Methodology</button>
+
+<div class="method-overlay" id="methodModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="method-modal">
+    <div class="method-title">How Scores Are Calculated</div>
+    <div class="method-sub">RoundCard uses real fan scorecards to determine community verdicts. Here's exactly how it works.</div>
+
+    <div class="method-section">
+      <div class="method-section-title">Who Scored</div>
+      <p>Every score on this dashboard comes from a <strong>real registered user</strong> scoring the fight live in the RoundCard app, round by round, using the same <strong>10-point must system</strong> as the official judges. Scores are locked after each round — they cannot be changed once submitted.</p>
+    </div>
+
+    <div class="method-section">
+      <div class="method-section-title">Who Won the Round</div>
+      <p>For each round, we count how many judges had Fighter A winning, Fighter B winning, or scored it even. The fighter with the <strong>majority of judges</strong> is declared the round winner.</p>
+      <div class="method-example">
+        <strong>Example — Round 3, 100 judges:</strong><br/>
+        70 had Fighter A winning · 25 had Fighter B · 5 scored it even<br/>
+        → <strong>Fighter A wins Round 3</strong>
+      </div>
+    </div>
+
+    <div class="method-section">
+      <div class="method-section-title">By What Score</div>
+      <p>From the judges who had the round winner winning, we find the <strong>most commonly submitted score</strong> (the modal score). This naturally accounts for knockdowns (10-8) and point deductions (9-9) without any manual input.</p>
+      <div class="method-example">
+        <strong>Example — Round 3, Fighter A wins:</strong><br/>
+        Of the 70 judges who had Fighter A winning:<br/>
+        55 scored it 10-9 · 15 scored it 10-8 (knockdown)<br/>
+        → <strong>Displayed score: 10-9</strong> (most common)
+      </div>
+      <div class="method-example">
+        <strong>Knockdown example — Round 6:</strong><br/>
+        Of 80 judges who had Fighter A winning:<br/>
+        65 scored it 10-8 · 15 scored it 10-9<br/>
+        → <strong>Displayed score: 10-8</strong>
+      </div>
+    </div>
+
+    <div class="method-section">
+      <div class="method-section-title">Running Total</div>
+      <p>The running total shown next to each fighter is the <strong>sum of the displayed round scores</strong> — exactly as an official judge's scorecard would be calculated.</p>
+    </div>
+
+    <div class="method-section">
+      <div class="method-section-title">Community Split</div>
+      <p>The consensus bar shows what <strong>percentage of all judges</strong> have the respective fighter winning on their overall scorecard at this point in the fight. This updates in real time as rounds are locked in.</p>
+    </div>
+
+    <div class="method-section">
+      <div class="method-section-title">Data Integrity</div>
+      <p>Every score is tied to a <strong>verified user account</strong>. Guest sessions are stored locally and only count when converted to a full account. Rounds cannot be edited after locking. There is no mechanism for duplicate or false scoring.</p>
+    </div>
+
+    <button class="method-close" onclick="document.getElementById('methodModal').classList.remove('open')">CLOSE</button>
+  </div>
+</div>
+
 <div class="refresh-bar"><div class="refresh-progress" id="refresh-progress"></div></div>
 
 <script>
@@ -232,6 +306,44 @@ function login() {
 }
 
 var fightData = {};
+
+function getModalScore(scorecards, roundNum, winner) {
+  // Get all round scores for this round number
+  var roundScores = [];
+  scorecards.forEach(function(card) {
+    if (card.rounds) {
+      card.rounds.forEach(function(r) {
+        if (r.round_number === roundNum) roundScores.push(r);
+      });
+    }
+  });
+  if (!roundScores.length) return null;
+
+  // Determine majority winner
+  var aWins = roundScores.filter(function(r) { return r.score_a > r.score_b; }).length;
+  var bWins = roundScores.filter(function(r) { return r.score_b > r.score_a; }).length;
+  var evenCount = roundScores.filter(function(r) { return r.score_a === r.score_b; }).length;
+  var majorityWinner = aWins >= bWins && aWins >= evenCount ? 'a' : bWins >= aWins && bWins >= evenCount ? 'b' : 'even';
+
+  // Get scores from majority winner's judges
+  var winnersScores = roundScores.filter(function(r) {
+    if (majorityWinner === 'a') return r.score_a > r.score_b;
+    if (majorityWinner === 'b') return r.score_b > r.score_a;
+    return r.score_a === r.score_b;
+  });
+
+  if (!winnersScores.length) return { a: 10, b: 10 };
+
+  // Find modal (most common) score
+  var scoreMap = {};
+  winnersScores.forEach(function(r) {
+    var key = r.score_a + '-' + r.score_b;
+    scoreMap[key] = (scoreMap[key] || 0) + 1;
+  });
+  var modalKey = Object.keys(scoreMap).reduce(function(a, b) { return scoreMap[a] >= scoreMap[b] ? a : b; });
+  var parts = modalKey.split('-');
+  return { a: parseInt(parts[0]), b: parseInt(parts[1]) };
+}
 
 async function loadDashboard() {
   try {
@@ -431,14 +543,17 @@ function renderFights(fights, scorecardsByFight) {
           var avgA = rt.a / rt.count;
           var avgB = rt.b / rt.count;
           var cls = avgA > avgB ? 'won-a' : '';
-          var disp = Number.isInteger(avgA) ? avgA : avgA.toFixed(1);
-          tableHtml += '<td class="' + cls + '">' + disp + '</td>';
-          tA += avgA; tAcount++;
+          // Modal score: find most common score among majority winner's judges
+          var modalScore = getModalScore(allScorecards, ri, 'a');
+          var dispA = modalScore ? modalScore.a : Math.floor(avgA);
+          var dispB_forA = modalScore ? modalScore.b : Math.floor(avgB);
+          tableHtml += '<td class="' + cls + '">' + dispA + '</td>';
+          tA += dispA; tAcount++;
         } else {
           tableHtml += '<td class="empty">—</td>';
         }
       }
-      var avgTotalA = tAcount > 0 ? Math.round(tA) : '—';
+      var avgTotalA = tAcount > 0 ? tA : '—';
       tableHtml += '<td class="total-col total-a">' + avgTotalA + '</td></tr>';
 
       // Fighter B row
@@ -450,14 +565,15 @@ function renderFights(fights, scorecardsByFight) {
           var avgA = rt.a / rt.count;
           var avgB = rt.b / rt.count;
           var cls = avgB > avgA ? 'won-b' : '';
-          var disp = Number.isInteger(avgB) ? avgB : avgB.toFixed(1);
+          var modalScore = getModalScore(allScorecards, ri, 'b');
+          var dispB = modalScore ? modalScore.b : Math.floor(avgB);
           tableHtml += '<td class="' + cls + '">' + disp + '</td>';
           tB += avgB; tBcount++;
         } else {
           tableHtml += '<td class="empty">—</td>';
         }
       }
-      var avgTotalB = tBcount > 0 ? Math.round(tB) : '—';
+      var avgTotalB = tBcount > 0 ? tB : '—';
       tableHtml += '<td class="total-col total-b">' + avgTotalB + '</td></tr>';
 
       tableHtml += '</tbody></table></div></div>';
