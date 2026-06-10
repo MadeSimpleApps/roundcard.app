@@ -282,7 +282,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 // ── CONFIGURE PER EVENT ──────────────────────────────────────────
 const EVENT_NAME     = 'Zuffa Boxing 7: Billam-Smith vs. Rozicki';   // Must match event_name in fights table exactly
-const EVENT_PASSWORD = 'test123';       // Change per event
+const EVENT_PASSWORD = 'toptier2026';       // Change per event
 const EVENT_DATE     = 'July 2026';
 // ────────────────────────────────────────────────────────────────
 
@@ -395,12 +395,12 @@ async function loadDashboard() {
     document.getElementById('most-scored-fight').style.fontSize = '16px';
 
     // Render fight cards
-    renderFights(fights, scorecardsByFight);
+    renderFights(fights, scorecardsByFight, allScorecards);
 
   } catch(e) { console.error('Dashboard error:', e); }
 }
 
-function renderFights(fights, scorecardsByFight) {
+function renderFights(fights, scorecardsByFight, allScorecards) {
   var container = document.getElementById('fights-container');
   var html = '';
 
