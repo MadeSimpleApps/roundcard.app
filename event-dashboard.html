@@ -511,9 +511,18 @@ function renderFights(fights, scorecardsByFight, allScorecards) {
     html += '<div class="fight-card ' + (hasData ? 'has-data' : '') + '">';
     html += '<div class="fight-card-header"><span class="fight-weight">' + (fight.weight_class || '') + '</span>' + statusHtml + '</div>';
     html += '<div class="fighters-row">';
-    html += '<div class="fighter">' + photoA + '<div class="fighter-name">' + fAname + '</div>' + (fArecord ? '<div class="fighter-record">' + fArecord + '</div>' : '') + '<div class="fighter-score score-a">' + (hasData ? avgA : '—') + '</div></div>';
+    // Calculate modal-based totals for display
+    var modalTotalA = 0, modalTotalB = 0, modalRoundCount = 0;
+    Object.keys(roundTotals).forEach(function(rn) {
+      var ms = getModalScore(allScorecards, parseInt(rn), 'a');
+      if (ms) { modalTotalA += ms.a; modalTotalB += ms.b; modalRoundCount++; }
+    });
+    var displayA = modalRoundCount > 0 ? modalTotalA : (hasData ? avgA : '—');
+    var displayB = modalRoundCount > 0 ? modalTotalB : (hasData ? avgB : '—');
+
+    html += '<div class="fighter">' + photoA + '<div class="fighter-name">' + fAname + '</div>' + (fArecord ? '<div class="fighter-record">' + fArecord + '</div>' : '') + '<div class="fighter-score score-a">' + displayA + '</div></div>';
     html += '<div class="vs-col"><div class="vs-txt">VS</div><div class="fight-rounds">' + (fight.scheduled_rounds || 12) + 'R</div></div>';
-    html += '<div class="fighter">' + photoB + '<div class="fighter-name">' + fBname + '</div>' + (fBrecord ? '<div class="fighter-record">' + fBrecord + '</div>' : '') + '<div class="fighter-score score-b">' + (hasData ? avgB : '—') + '</div></div>';
+    html += '<div class="fighter">' + photoB + '<div class="fighter-name">' + fBname + '</div>' + (fBrecord ? '<div class="fighter-record">' + fBrecord + '</div>' : '') + '<div class="fighter-score score-b">' + displayB + '</div></div>';
     html += '</div>';
     html += officialHtml;
     html += '<div class="consensus-section">';
