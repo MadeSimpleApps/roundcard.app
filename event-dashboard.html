@@ -281,8 +281,8 @@ const SUPABASE_URL = 'https://aeiosubhurnlwsaqrwwj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFlaW9zdWJodXJubHdzYXFyd3dqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNzE3MzAsImV4cCI6MjA5NDk0NzczMH0.N2aN4NOzRpiCtEYhiagyPHjac2Jyj4aDskQLxLz_7cM';
 
 // ── CONFIGURE PER EVENT ──────────────────────────────────────────
-const EVENT_NAME     = 'Zuffa Boxing 7: Billam-Smith vs. Rozicki';   // Must match event_name in fights table exactly
-const EVENT_PASSWORD = 'test123';       // Change per event
+const EVENT_NAME     = 'Top Tier Boxing';   // Must match event_name in fights table exactly
+const EVENT_PASSWORD = 'toptier2026';       // Change per event
 const EVENT_DATE     = 'July 2026';
 // ────────────────────────────────────────────────────────────────
 
@@ -540,13 +540,11 @@ function renderFights(fights, scorecardsByFight, allScorecards) {
       for (var ri = 1; ri <= fight.scheduled_rounds; ri++) {
         var rt = roundTotals[ri];
         if (rt) {
-          var avgA = rt.a / rt.count;
-          var avgB = rt.b / rt.count;
-          var cls = avgA > avgB ? 'won-a' : '';
-          // Modal score: find most common score among majority winner's judges
           var modalScore = getModalScore(allScorecards, ri, 'a');
-          var dispA = modalScore ? modalScore.a : Math.floor(avgA);
-          var dispB_forA = modalScore ? modalScore.b : Math.floor(avgB);
+          var dispA = modalScore ? modalScore.a : 10;
+          var dispB_forA = modalScore ? modalScore.b : 9;
+          // Highlight based on modal score winner not raw average
+          var cls = dispA > dispB_forA ? 'won-a' : '';
           tableHtml += '<td class="' + cls + '">' + dispA + '</td>';
           tA += dispA; tAcount++;
         } else {
@@ -562,13 +560,13 @@ function renderFights(fights, scorecardsByFight, allScorecards) {
       for (var ri = 1; ri <= fight.scheduled_rounds; ri++) {
         var rt = roundTotals[ri];
         if (rt) {
-          var avgA = rt.a / rt.count;
-          var avgB = rt.b / rt.count;
-          var cls = avgB > avgA ? 'won-b' : '';
           var modalScore = getModalScore(allScorecards, ri, 'b');
-          var dispB = modalScore ? modalScore.b : Math.floor(avgB);
+          var dispA_forB = modalScore ? modalScore.a : 9;
+          var dispB = modalScore ? modalScore.b : 10;
+          // Highlight based on modal score winner
+          var cls = dispB > dispA_forB ? 'won-b' : '';
           tableHtml += '<td class="' + cls + '">' + dispB + '</td>';
-          tB += avgB; tBcount++;
+          tB += dispB; tBcount++;
         } else {
           tableHtml += '<td class="empty">—</td>';
         }
