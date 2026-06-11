@@ -309,12 +309,6 @@ function login() {
 var fightData = {};
 
 function getRoundScore(roundScores, overrides, roundNum) {
-  // Check for manual override first
-  if (overrides && (overrides[roundNum] || overrides[String(roundNum)])) {
-    var ov = overrides[roundNum] || overrides[String(roundNum)];
-    return { a: ov.score_a, b: ov.score_b, overridden: true, winner: ov.score_a > ov.score_b ? 'a' : ov.score_b > ov.score_a ? 'b' : 'even' };
-  }
-
   if (!roundScores.length) return null;
 
   var total = roundScores.length;
@@ -369,7 +363,7 @@ async function loadDashboard() {
     // Fetch all fights for this event
     var fightsRes = await db
       .from('fights_with_status')
-      .select('*, fighter_a:fighters!fights_fighter_a_id_fkey(*), fighter_b:fighters!fights_fighter_b_id_fkey(*), broadcaster:broadcasters(name, logo_url), round_overrides')
+      .select('*, fighter_a:fighters!fights_fighter_a_id_fkey(*), fighter_b:fighters!fights_fighter_b_id_fkey(*), broadcaster:broadcasters(name, logo_url)')
       .eq('event_name', EVENT_NAME)
       .order('fight_date', { ascending: true });
 
@@ -532,7 +526,7 @@ function renderFights(fights, scorecardsByFight, allScorecards) {
     html += '<div class="fighters-row">';
     // Calculate totals using same majority score logic as table
     var displayA = 0, displayB = 0, displayCount = 0;
-    var fightOverridesTop = fight.round_overrides || {};
+    var fightOverridesTop = {};
     Object.keys(roundTotals).forEach(function(rn) {
       var roundScoresTop = [];
       (scorecardsByFight[fight.id] || []).forEach(function(card) {
@@ -568,7 +562,7 @@ function renderFights(fights, scorecardsByFight, allScorecards) {
       }
       tableHtml += '<th style="border-left:0.5px solid var(--mid);padding-left:10px">AVG</th></tr></thead><tbody>';
 
-      var fightOverrides = fight.round_overrides || {};
+      var fightOverrides = {};
       var fightCards = scorecardsByFight[fight.id] || [];
 
       // Fighter A row
@@ -588,8 +582,7 @@ function renderFights(fights, scorecardsByFight, allScorecards) {
         if (hasRound) {
           var rs = getRoundScore(roundScores, fightOverrides, ri);
           var cls = rs.winner === 'a' ? 'won-a' : rs.winner === 'even' ? 'won-even' : '';
-          var ovIcon = rs.overridden ? ' <span style="font-size:8px">🔒</span>' : '';
-          tableHtml += '<td class="' + cls + '">' + rs.a + ovIcon + '</td>';
+          tableHtml += '<td class="' + cls + '">' + rs.a + '</td>';
           tA += rs.a; tAcount++;
         } else {
           tableHtml += '<td class="empty">—</td>';
@@ -614,8 +607,7 @@ function renderFights(fights, scorecardsByFight, allScorecards) {
         if (hasRound) {
           var rs = getRoundScore(roundScores, fightOverrides, ri);
           var cls = rs.winner === 'b' ? 'won-b' : rs.winner === 'even' ? 'won-even' : '';
-          var ovIcon = rs.overridden ? ' <span style="font-size:8px">🔒</span>' : '';
-          tableHtml += '<td class="' + cls + '">' + rs.b + ovIcon + '</td>';
+          tableHtml += '<td class="' + cls + '">' + rs.b + '</td>';
           tB += rs.b; tBcount++;
         } else {
           tableHtml += '<td class="empty">—</td>';
