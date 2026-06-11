@@ -563,7 +563,7 @@ function renderFights(fights, scorecardsByFight, allScorecards) {
     html += '</div>';
     html += officialHtml;
     html += '<div class="consensus-section">';
-    html += '<div class="consensus-header"><span class="consensus-label">Community Consensus</span><span class="consensus-count">' + total + ' judge' + (total !== 1 ? 's' : '') + '</span></div>';
+    html += '<div class="consensus-header"><span class="consensus-label"><span class="tooltip-wrap">Community Consensus<i class="tooltip-icon">?</i><span class="tooltip-box">The % of judges who have each fighter <strong>winning overall</strong> on their scorecard. One vote per judge regardless of round margins.</span></span></span><span class="consensus-count">' + total + ' judge' + (total !== 1 ? 's' : '') + '</span></div>';
     html += barHtml;
     if (hasData && total > 0) {
       html += '<div class="consensus-pct"><span class="pct-a">' + fAshort + ' ' + aPct + '%</span>';
@@ -573,7 +573,7 @@ function renderFights(fights, scorecardsByFight, allScorecards) {
     html += '</div>';
     if (roundKeys.length > 0) {
       var tableHtml = '<div class="scorecard-table-section">';
-      tableHtml += '<div class="scorecard-table-label">Viewers\' Verdict · Round by Round Average</div>';
+      tableHtml += '<div class="scorecard-table-label"><span class="tooltip-wrap">Viewers\' Verdict · Round by Round<i class="tooltip-icon">?</i><span class="tooltip-box">Built round by round using the <strong>majority winner</strong> of each round. A round with no clear majority defaults to 10-10. May differ from the consensus % above.</span></span></div>';
       tableHtml += '<div style="overflow-x:auto"><table class="scorecard-table"><thead><tr><th></th>';
       for (var ri = 0; ri < fight.scheduled_rounds; ri++) {
         tableHtml += '<th>R' + (ri+1) + '</th>';
