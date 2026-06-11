@@ -146,6 +146,11 @@ body{background:var(--black);color:var(--bone);font-family:-apple-system,BlinkMa
 .method-example{background:var(--black);border-radius:8px;padding:12px 16px;margin:10px 0;font-size:12px;color:var(--sub);line-height:1.8;border:0.5px solid var(--mid)}
 .method-example strong{color:var(--bone)}
 .method-close{width:100%;background:var(--red);border:none;border-radius:8px;padding:12px;color:white;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px}
+.tooltip-wrap{position:relative;display:inline-flex;align-items:center;gap:5px}
+.tooltip-icon{width:14px;height:14px;border-radius:50%;background:var(--mid);border:0.5px solid #3A3A3F;display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:var(--sub);cursor:help;flex-shrink:0;font-style:normal}
+.tooltip-box{display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#111;border:0.5px solid var(--mid);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--sub);line-height:1.6;width:240px;z-index:50;pointer-events:none}
+.tooltip-box strong{color:var(--bone)}
+.tooltip-wrap:hover .tooltip-box{display:block}
 
 /* FOOTER */
 .dash-footer{text-align:center;padding:32px;border-top:0.5px solid var(--mid);font-size:12px;color:var(--sub)}
@@ -264,6 +269,19 @@ body{background:var(--black);color:var(--bone);font-family:-apple-system,BlinkMa
     <div class="method-section">
       <div class="method-section-title">Community Split</div>
       <p>The consensus bar shows what <strong>percentage of all judges</strong> have the respective fighter winning on their overall scorecard at this point in the fight. This updates in real time as rounds are locked in.</p>
+    </div>
+
+    <div class="method-section">
+      <div class="method-section-title">Why the Numbers May Differ</div>
+      <p>You may notice the <strong>Community Consensus</strong> percentage doesn't always align perfectly with the <strong>Viewers' Verdict</strong> round-by-round total. This is intentional and reflects two different ways of looking at the same data.</p>
+      <p><strong>Community Consensus</strong> is based on each judge's overall scorecard — who they have winning the fight as a whole. A judge who has Fighter A winning 7 rounds to 5 counts as one vote for Fighter A regardless of the margin.</p>
+      <p><strong>Viewers' Verdict</strong> is a round-by-round construction — it takes the majority winner of each individual round and builds a composite scorecard from those results. This can produce a different picture because a judge may have Fighter A winning overall on their card, but scored individual rounds differently to the majority of other judges.</p>
+      <div class="method-example">
+        <strong>Example:</strong><br/>
+        3 judges score a fight. 2 have Fighter A winning overall → Consensus shows 67% Fighter A.<br/>
+        But in Round 4, only 1 judge had Fighter A winning that round — the other 2 scored it differently. The Viewers' Verdict shows Round 4 as 10-10 (no majority).<br/>
+        → <strong>Consensus and Viewers' Verdict can tell different stories. Both are valid.</strong>
+      </div>
     </div>
 
     <div class="method-section">
