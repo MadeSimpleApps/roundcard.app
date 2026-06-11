@@ -4,7 +4,74 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RoundCard Admin</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+var currentOverrideFightId = null;
+var currentOverrideRounds = 12;
+
+function openOverrideModal(fightId, fightName, rounds, overridesJson) {
+  currentOverrideFightId = fightId;
+  currentOverrideRounds = rounds;
+  var overrides = {};
+  try { overrides = JSON.parse(overridesJson); } catch(e) {}
+  document.getElementById('overrideFightName').textContent = fightName;
+  document.getElementById('overrideMsg').textContent = '';
+
+  var grid = document.getElementById('overrideRoundsGrid');
+  var html = '';
+  html += '<div style="display:grid;grid-template-columns:60px 1fr 1fr 1fr 1fr;gap:8px;align-items:center;padding:0 4px;">';
+  html += '<span style="font-size:10px;font-weight:700;color:var(--sub);letter-spacing:1px;">ROUND</span>';
+  html += '<span style="font-size:10px;font-weight:700;color:var(--red);letter-spacing:1px;text-align:center;">A SCORE</span>';
+  html += '<span style="font-size:10px;font-weight:700;color:var(--blue);letter-spacing:1px;text-align:center;">B SCORE</span>';
+  html += '<span style="font-size:10px;font-weight:700;color:var(--sub);letter-spacing:1px;text-align:center;">NOTE</span>';
+  html += '<span style="font-size:10px;font-weight:700;color:var(--sub);letter-spacing:1px;text-align:center;">CLEAR</span>';
+  html += '</div>';
+
+  for (var i = 1; i <= rounds; i++) {
+    var ov = overrides[i] || overrides[String(i)] || {};
+    var hasOverride = ov.score_a != null;
+    html += '<div style="display:grid;grid-template-columns:60px 1fr 1fr 1fr 1fr;gap:8px;align-items:center;background:' + (hasOverride ? 'rgba(201,168,76,0.06)' : 'var(--black)') + ';border-radius:8px;padding:8px;border:0.5px solid ' + (hasOverride ? 'rgba(201,168,76,0.3)' : '#2A2A2F') + ';">';
+    html += '<span style="font-size:13px;font-weight:700;color:' + (hasOverride ? 'var(--gold)' : 'var(--sub)') + ';">R' + i + (hasOverride ? ' 🔒' : '') + '</span>';
+    html += '<input id="ov-a-' + i + '" type="number" min="1" max="10" value="' + (ov.score_a || '') + '" placeholder="—" style="background:#0D0D0F;border:0.5px solid #3A3A3F;border-radius:6px;padding:6px;color:var(--red);font-size:13px;font-weight:700;text-align:center;width:100%;outline:none;"/>';
+    html += '<input id="ov-b-' + i + '" type="number" min="1" max="10" value="' + (ov.score_b || '') + '" placeholder="—" style="background:#0D0D0F;border:0.5px solid #3A3A3F;border-radius:6px;padding:6px;color:var(--blue);font-size:13px;font-weight:700;text-align:center;width:100%;outline:none;"/>';
+    html += '<input id="ov-note-' + i + '" type="text" value="' + (ov.note || '') + '" placeholder="e.g. Knockdown" style="background:#0D0D0F;border:0.5px solid #3A3A3F;border-radius:6px;padding:6px;color:var(--sub);font-size:11px;width:100%;outline:none;"/>';
+    html += '<button onclick="clearOverrideRow(' + i + ')" style="background:#1a0505;border:none;border-radius:6px;padding:6px;color:#ff6b6b;cursor:pointer;font-size:12px;width:100%;">✕</button>';
+    html += '</div>';
+  }
+  grid.innerHTML = html;
+  document.getElementById('overrideModal').style.display = 'flex';
+}
+
+function clearOverrideRow(round) {
+  document.getElementById('ov-a-' + round).value = '';
+  document.getElementById('ov-b-' + round).value = '';
+  document.getElementById('ov-note-' + round).value = '';
+}
+
+function closeOverrideModal() {
+  document.getElementById('overrideModal').style.display = 'none';
+}
+
+async function saveOverrides() {
+  var overrides = {};
+  for (var i = 1; i <= currentOverrideRounds; i++) {
+    var a = document.getElementById('ov-a-' + i)?.value;
+    var b = document.getElementById('ov-b-' + i)?.value;
+    var note = document.getElementById('ov-note-' + i)?.value?.trim();
+    if (a !== '' && b !== '' && a != null && b != null) {
+      overrides[i] = { score_a: parseInt(a), score_b: parseInt(b) };
+      if (note) overrides[i].note = note;
+    }
+  }
+  var res = await db.from('fights').update({ round_overrides: overrides }).eq('id', currentOverrideFightId);
+  if (res.error) {
+    document.getElementById('overrideMsg').innerHTML = '<span style="color:var(--red)">Error: ' + res.error.message + '</span>';
+    return;
+  }
+  document.getElementById('overrideMsg').innerHTML = '<span style="color:var(--green)">✓ Overrides saved!</span>';
+  setTimeout(function() { closeOverrideModal(); loadFights(); }, 1200);
+}
+
+</script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -838,6 +905,7 @@ async function loadFights() {
           <input id="seed-split-b-${f.id}" type="number" value="${f.seed_split_b || 0}" min="0" max="100" style="background:var(--black);border:0.5px solid #3A3A3F;border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;width:60px;outline:none;"/>
         </div>
         <button class="btn btn-mid btn-sm" onclick="saveSeedData('${f.id}', this)">SAVE SEED</button>
+        <button class="btn btn-sm" style="background:rgba(201,168,76,0.1);color:var(--gold);border:0.5px solid rgba(201,168,76,0.3);" onclick="openOverrideModal('${f.id}', '${(f.fighter_a?.name || '').replace(/'/g, '')} vs ${(f.fighter_b?.name || '').replace(/'/g, '')}', ${f.scheduled_rounds || 12}, JSON.stringify(f.round_overrides || {}))">🔒 OVERRIDES</button>
       </div>
     </div>`;
 
@@ -1324,6 +1392,26 @@ if (sessionStorage.getItem('rc_admin') === '1') init();
       <div style="font-size:12px;color:var(--sub);letter-spacing:0.5px;margin-bottom:10px;">ALL BROADCASTERS</div>
       <div id="bcList"><div class="empty">No broadcasters yet</div></div>
     </div>
+  </div>
+</div>
+
+
+<!-- Round Override Modal -->
+<div id="overrideModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#1A1A1E;border:0.5px solid #2A2A2F;border-radius:16px;padding:28px;width:100%;max-width:520px;max-height:80vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div>
+        <div style="font-size:18px;font-weight:900;color:var(--bone);">🔒 Round Overrides</div>
+        <div style="font-size:12px;color:var(--sub);margin-top:2px;" id="overrideFightName"></div>
+      </div>
+      <button onclick="closeOverrideModal()" style="background:var(--mid);border:none;border-radius:8px;padding:8px 14px;color:var(--sub);cursor:pointer;font-size:14px;">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:16px;background:rgba(201,168,76,0.08);border:0.5px solid rgba(201,168,76,0.25);border-radius:8px;padding:10px 14px;">
+      ⚠️ Overrides replace community data on the dashboard. Use for confirmed knockdowns, deductions or data corrections only. Overridden rounds show a 🔒 indicator.
+    </div>
+    <div id="overrideRoundsGrid" style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;"></div>
+    <button onclick="saveOverrides()" style="width:100%;background:var(--red);border:none;border-radius:10px;padding:13px;color:white;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:0.5px;">SAVE OVERRIDES →</button>
+    <div id="overrideMsg" style="margin-top:10px;"></div>
   </div>
 </div>
 
