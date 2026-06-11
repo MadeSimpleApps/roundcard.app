@@ -121,6 +121,7 @@ body{background:var(--black);color:var(--bone);font-family:-apple-system,BlinkMa
 .scorecard-table tr:last-child td{border-bottom:none}
 .scorecard-table td.won-a{background:rgba(232,0,29,0.12);color:var(--red);border-radius:4px}
 .scorecard-table td.won-b{background:rgba(95,168,232,0.12);color:var(--blue);border-radius:4px}
+.scorecard-table td.won-even{background:rgba(201,168,76,0.12);color:var(--gold);border-radius:4px}
 .scorecard-table td.empty{color:var(--mid)}
 .scorecard-table .total-col{font-size:15px;font-weight:900;border-left:0.5px solid var(--mid);padding-left:10px}
 .total-a{color:var(--red)}
@@ -282,7 +283,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 // ── CONFIGURE PER EVENT ──────────────────────────────────────────
 const EVENT_NAME     = 'Zuffa Boxing 7: Billam-Smith vs. Rozicki';   // Must match event_name in fights table exactly
-const EVENT_PASSWORD = 'test1234';       // Change per event
+const EVENT_PASSWORD = 'test123';       // Change per event
 const EVENT_DATE     = 'July 2026';
 // ────────────────────────────────────────────────────────────────
 
@@ -307,42 +308,60 @@ function login() {
 
 var fightData = {};
 
-function getModalScore(scorecards, roundNum, winner) {
-  // Get all round scores for this round number
-  var roundScores = [];
-  scorecards.forEach(function(card) {
-    if (card.rounds) {
-      card.rounds.forEach(function(r) {
-        if (r.round_number === roundNum) roundScores.push(r);
-      });
-    }
-  });
+function getRoundScore(roundScores, overrides, roundNum) {
+  // Check for manual override first
+  if (overrides && (overrides[roundNum] || overrides[String(roundNum)])) {
+    var ov = overrides[roundNum] || overrides[String(roundNum)];
+    return { a: ov.score_a, b: ov.score_b, overridden: true, winner: ov.score_a > ov.score_b ? 'a' : ov.score_b > ov.score_a ? 'b' : 'even' };
+  }
+
   if (!roundScores.length) return null;
 
-  // Determine majority winner
+  var total = roundScores.length;
   var aWins = roundScores.filter(function(r) { return r.score_a > r.score_b; }).length;
   var bWins = roundScores.filter(function(r) { return r.score_b > r.score_a; }).length;
-  var evenCount = roundScores.filter(function(r) { return r.score_a === r.score_b; }).length;
-  var majorityWinner = aWins >= bWins && aWins >= evenCount ? 'a' : bWins >= aWins && bWins >= evenCount ? 'b' : 'even';
+
+  // Strict majority required — anything not strictly >50% defaults to 10-10
+  var winner;
+  if (aWins / total > 0.5) {
+    winner = 'a';
+  } else if (bWins / total > 0.5) {
+    winner = 'b';
+  } else {
+    // Genuine split or tie — 10-10
+    return { a: 10, b: 10, overridden: false, winner: 'even' };
+  }
 
   // Get scores from majority winner's judges
   var winnersScores = roundScores.filter(function(r) {
-    if (majorityWinner === 'a') return r.score_a > r.score_b;
-    if (majorityWinner === 'b') return r.score_b > r.score_a;
-    return r.score_a === r.score_b;
+    return winner === 'a' ? r.score_a > r.score_b : r.score_b > r.score_a;
   });
 
-  if (!winnersScores.length) return { a: 10, b: 10 };
-
-  // Find modal (most common) score
+  // Find most common score among winner's judges
   var scoreMap = {};
   winnersScores.forEach(function(r) {
     var key = r.score_a + '-' + r.score_b;
     scoreMap[key] = (scoreMap[key] || 0) + 1;
   });
-  var modalKey = Object.keys(scoreMap).reduce(function(a, b) { return scoreMap[a] >= scoreMap[b] ? a : b; });
-  var parts = modalKey.split('-');
-  return { a: parseInt(parts[0]), b: parseInt(parts[1]) };
+
+  // Get modal score — ties default to 10-9
+  var bestKey = null, bestCount = 0;
+  Object.keys(scoreMap).forEach(function(k) {
+    if (scoreMap[k] > bestCount) { bestKey = k; bestCount = scoreMap[k]; }
+    else if (scoreMap[k] === bestCount && bestKey) {
+      // Tie in modal — prefer 10-9 (most common boxing score)
+      var kParts = k.split('-');
+      var bParts = bestKey.split('-');
+      var kWinnerScore = winner === 'a' ? parseInt(kParts[0]) : parseInt(kParts[1]);
+      var bWinnerScore = winner === 'a' ? parseInt(bParts[0]) : parseInt(bParts[1]);
+      // Lower winner score = more conservative = prefer it (e.g. 10-9 over 10-8)
+      if (kWinnerScore < bWinnerScore) bestKey = k;
+    }
+  });
+
+  if (!bestKey) return { a: 10, b: 9, overridden: false, winner: winner };
+  var parts = bestKey.split('-');
+  return { a: parseInt(parts[0]), b: parseInt(parts[1]), overridden: false, winner: winner };
 }
 
 async function loadDashboard() {
@@ -350,7 +369,7 @@ async function loadDashboard() {
     // Fetch all fights for this event
     var fightsRes = await db
       .from('fights_with_status')
-      .select('*, fighter_a:fighters!fights_fighter_a_id_fkey(*), fighter_b:fighters!fights_fighter_b_id_fkey(*), broadcaster:broadcasters(name, logo_url)')
+      .select('*, fighter_a:fighters!fights_fighter_a_id_fkey(*), fighter_b:fighters!fights_fighter_b_id_fkey(*), broadcaster:broadcasters(name, logo_url), round_overrides')
       .eq('event_name', EVENT_NAME)
       .order('fight_date', { ascending: true });
 
@@ -511,14 +530,20 @@ function renderFights(fights, scorecardsByFight, allScorecards) {
     html += '<div class="fight-card ' + (hasData ? 'has-data' : '') + '">';
     html += '<div class="fight-card-header"><span class="fight-weight">' + (fight.weight_class || '') + '</span>' + statusHtml + '</div>';
     html += '<div class="fighters-row">';
-    // Calculate modal-based totals for display
-    var modalTotalA = 0, modalTotalB = 0, modalRoundCount = 0;
+    // Calculate totals using same majority score logic as table
+    var displayA = 0, displayB = 0, displayCount = 0;
+    var fightOverridesTop = fight.round_overrides || {};
     Object.keys(roundTotals).forEach(function(rn) {
-      var ms = getModalScore(allScorecards, parseInt(rn), 'a');
-      if (ms) { modalTotalA += ms.a; modalTotalB += ms.b; modalRoundCount++; }
+      var roundScoresTop = [];
+      (scorecardsByFight[fight.id] || []).forEach(function(card) {
+        if (card.rounds) card.rounds.forEach(function(r) {
+          if (r.round_number === parseInt(rn)) roundScoresTop.push(r);
+        });
+      });
+      var rs = getRoundScore(roundScoresTop, fightOverridesTop, parseInt(rn));
+      if (rs) { displayA += rs.a; displayB += rs.b; displayCount++; }
     });
-    var displayA = modalRoundCount > 0 ? modalTotalA : (hasData ? avgA : '—');
-    var displayB = modalRoundCount > 0 ? modalTotalB : (hasData ? avgB : '—');
+    if (displayCount === 0) { displayA = hasData ? avgA : '—'; displayB = hasData ? avgB : '—'; }
 
     html += '<div class="fighter">' + photoA + '<div class="fighter-name">' + fAname + '</div>' + (fArecord ? '<div class="fighter-record">' + fArecord + '</div>' : '') + '<div class="fighter-score score-a">' + displayA + '</div></div>';
     html += '<div class="vs-col"><div class="vs-txt">VS</div><div class="fight-rounds">' + (fight.scheduled_rounds || 12) + 'R</div></div>';
@@ -543,45 +568,61 @@ function renderFights(fights, scorecardsByFight, allScorecards) {
       }
       tableHtml += '<th style="border-left:0.5px solid var(--mid);padding-left:10px">AVG</th></tr></thead><tbody>';
 
+      var fightOverrides = fight.round_overrides || {};
+      var fightCards = scorecardsByFight[fight.id] || [];
+
       // Fighter A row
       tableHtml += '<tr><td>' + fAshort + '</td>';
       var tA = 0, tAcount = 0;
       for (var ri = 1; ri <= fight.scheduled_rounds; ri++) {
-        var rt = roundTotals[ri];
-        if (rt) {
-          var modalScore = getModalScore(allScorecards, ri, 'a');
-          var dispA = modalScore ? modalScore.a : 10;
-          var dispB_forA = modalScore ? modalScore.b : 9;
-          // Highlight based on modal score winner not raw average
-          var cls = dispA > dispB_forA ? 'won-a' : '';
-          tableHtml += '<td class="' + cls + '">' + dispA + '</td>';
-          tA += dispA; tAcount++;
+        // Get round scores for this round from this fight's scorecards
+        var roundScores = [];
+        fightCards.forEach(function(card) {
+          if (card.rounds) {
+            card.rounds.forEach(function(r) {
+              if (r.round_number === ri) roundScores.push(r);
+            });
+          }
+        });
+        var hasRound = roundScores.length > 0 || (fightOverrides[ri] || fightOverrides[String(ri)]);
+        if (hasRound) {
+          var rs = getRoundScore(roundScores, fightOverrides, ri);
+          var cls = rs.winner === 'a' ? 'won-a' : rs.winner === 'even' ? 'won-even' : '';
+          var ovIcon = rs.overridden ? ' <span style="font-size:8px">🔒</span>' : '';
+          tableHtml += '<td class="' + cls + '">' + rs.a + ovIcon + '</td>';
+          tA += rs.a; tAcount++;
         } else {
           tableHtml += '<td class="empty">—</td>';
         }
       }
-      var avgTotalA = tAcount > 0 ? tA : '—';
-      tableHtml += '<td class="total-col total-a">' + avgTotalA + '</td></tr>';
+      var totalA = tAcount > 0 ? tA : '—';
+      tableHtml += '<td class="total-col total-a">' + totalA + '</td></tr>';
 
       // Fighter B row
       tableHtml += '<tr><td>' + fBshort + '</td>';
       var tB = 0, tBcount = 0;
       for (var ri = 1; ri <= fight.scheduled_rounds; ri++) {
-        var rt = roundTotals[ri];
-        if (rt) {
-          var modalScore = getModalScore(allScorecards, ri, 'b');
-          var dispA_forB = modalScore ? modalScore.a : 9;
-          var dispB = modalScore ? modalScore.b : 10;
-          // Highlight based on modal score winner
-          var cls = dispB > dispA_forB ? 'won-b' : '';
-          tableHtml += '<td class="' + cls + '">' + dispB + '</td>';
-          tB += dispB; tBcount++;
+        var roundScores = [];
+        fightCards.forEach(function(card) {
+          if (card.rounds) {
+            card.rounds.forEach(function(r) {
+              if (r.round_number === ri) roundScores.push(r);
+            });
+          }
+        });
+        var hasRound = roundScores.length > 0 || (fightOverrides[ri] || fightOverrides[String(ri)]);
+        if (hasRound) {
+          var rs = getRoundScore(roundScores, fightOverrides, ri);
+          var cls = rs.winner === 'b' ? 'won-b' : rs.winner === 'even' ? 'won-even' : '';
+          var ovIcon = rs.overridden ? ' <span style="font-size:8px">🔒</span>' : '';
+          tableHtml += '<td class="' + cls + '">' + rs.b + ovIcon + '</td>';
+          tB += rs.b; tBcount++;
         } else {
           tableHtml += '<td class="empty">—</td>';
         }
       }
-      var avgTotalB = tBcount > 0 ? tB : '—';
-      tableHtml += '<td class="total-col total-b">' + avgTotalB + '</td></tr>';
+      var totalB = tBcount > 0 ? tB : '—';
+      tableHtml += '<td class="total-col total-b">' + totalB + '</td></tr>';
 
       tableHtml += '</tbody></table></div></div>';
       html += tableHtml;
