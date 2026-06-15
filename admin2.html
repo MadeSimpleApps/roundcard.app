@@ -873,7 +873,8 @@ function prefillEventForm(eventName, date, venue) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('panel-fights').classList.add('active');
-  document.querySelector('[onclick="showTab(\'fights\')"]').classList.add('active');
+  var fightsBtn = document.querySelector('[onclick*="showTab(\'fights\')"]') || document.querySelector('[onclick*="showTab(\"fights\""]');
+  if (fightsBtn) fightsBtn.classList.add('active');
 
   // Pre-fill the form
   document.getElementById('ev-name').value = eventName;
@@ -1036,7 +1037,7 @@ async function loadFighterPhotos() {
   const {data} = await db.from('fighters').select('id,name,avatar_url,record,weight_class').order('name');
   if (!data?.length) { el.innerHTML = '<div class="empty">No fighters yet.</div>'; return; }
   el.innerHTML = data.map(f => `
-    <div class="fighter-row" style="flex-wrap:wrap;gap:10px;">
+    <div class="fighter-row" data-name="${f.name.toLowerCase()}" style="flex-wrap:wrap;gap:10px;">
       <div class="fighter-avatar" style="border-color:${f.avatar_url ? 'var(--red)' : 'var(--mid)'}">
         ${f.avatar_url
           ? `<img src="${f.avatar_url}" onerror="this.parentElement.innerHTML='<span style=font-size:16px;font-weight:900;color:var(--sub)>${f.name.slice(0,2).toUpperCase()}</span>'">`
@@ -1268,7 +1269,9 @@ async function banFromReport(userId, username, reportId) {
 // ── FIGHTER SEARCH ────────────────────────────────────────────
 function filterFighters() {
   var q = (document.getElementById('fighter-search') ? document.getElementById('fighter-search').value : '').toLowerCase();
-  document.querySelectorAll('.fighter-row').forEach(function(row) {
+  var container = document.getElementById('manualFightersList') || document.getElementById('fightersList');
+  if (!container) return;
+  container.querySelectorAll('.fighter-row').forEach(function(row) {
     row.style.display = (row.getAttribute('data-name') || '').includes(q) ? '' : 'none';
   });
 }
