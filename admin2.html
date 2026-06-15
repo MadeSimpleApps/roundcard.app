@@ -856,7 +856,7 @@ async function loadFights() {
             <div class="event-group-meta" style="color:${statusColor}">${group.fights.length} fights · ${fmtDate(group.date)} · ${group.status.toUpperCase()}</div>
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
-            <button class="btn btn-mid btn-sm" onclick="event.stopPropagation();prefillEventForm('${eventName.replace(/'/g,"\'")}', '${group.date}', '${(group.fights[0]?.venue || '').replace(/'/g,"\'")}')">+ Add Fight</button>
+            <button class="btn btn-mid btn-sm" data-evname="${eventName.replace(/"/g,'&quot;')}" data-date="${group.date}" data-venue="${(group.fights[0]?.venue || '').replace(/"/g,'&quot;')}" onclick="event.stopPropagation();prefillEventFromBtn(this)">+ Add Fight</button>
             <span class="event-group-toggle ${isOpen ? 'open' : ''}" id="toggle-${idx}">▾</span>
           </div>
         </div>
@@ -866,6 +866,13 @@ async function loadFights() {
       </div>`;
   }).join('');
   setTimeout(populateBroadcasterSelects, 100);
+}
+
+function prefillEventFromBtn(btn) {
+  var eventName = btn.getAttribute('data-evname') || '';
+  var date = btn.getAttribute('data-date') || '';
+  var venue = btn.getAttribute('data-venue') || '';
+  prefillEventForm(eventName, date, venue);
 }
 
 function prefillEventForm(eventName, date, venue) {
