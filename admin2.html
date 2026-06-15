@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RoundCard Admin</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+
+// ── FIGHTER SEARCH ────────────────────────────────────────────
+function filterFighters() {
+  var q = (document.getElementById('fighter-search') ? document.getElementById('fighter-search').value : '').toLowerCase();
+  document.querySelectorAll('.fighter-row').forEach(function(row) {
+    row.style.display = (row.getAttribute('data-name') || '').includes(q) ? '' : 'none';
+  });
+}
+
 // ── EMBEDDED DASHBOARD ────────────────────────────────────────
 var dashRefreshTimer = null;
 
@@ -13,249 +22,138 @@ async function loadDashEventList() {
   if (!sel) return;
   var res = await db.from('fights').select('event_name').not('event_name', 'is', null).order('fight_date', { ascending: false });
   if (!res.data) return;
-  var events = [...new Set(res.data.map(function(f) { return f.event_name; }))];
+  var seen = {};
   var opts = '<option value="">Select an event...</option>';
-  events.forEach(function(e) { opts += '<option value="' + e + '">' + e + '</option>'; });
+  res.data.forEach(function(f) {
+    if (f.event_name && !seen[f.event_name]) {
+      seen[f.event_name] = true;
+      opts += '<option value="' + f.event_name + '">' + f.event_name + '</option>';
+    }
+  });
   sel.innerHTML = opts;
 }
 
 function dashGetRoundScore(roundScores) {
-  if (!roundScores.length) return null;
+  if (!roundScores || !roundScores.length) return null;
   var total = roundScores.length;
   var aWins = roundScores.filter(function(r) { return r.score_a > r.score_b; }).length;
   var bWins = roundScores.filter(function(r) { return r.score_b > r.score_a; }).length;
-  var winner;
-  if (aWins / total > 0.5) { winner = 'a'; }
-  else if (bWins / total > 0.5) { winner = 'b'; }
-  else { return { a: 10, b: 10, winner: 'even' }; }
-  var winnersScores = roundScores.filter(function(r) {
-    return winner === 'a' ? r.score_a > r.score_b : r.score_b > r.score_a;
-  });
-  var scoreMap = {};
-  winnersScores.forEach(function(r) {
-    var key = r.score_a + '-' + r.score_b;
-    scoreMap[key] = (scoreMap[key] || 0) + 1;
-  });
-  var bestKey = null, bestCount = 0;
-  Object.keys(scoreMap).forEach(function(k) {
-    if (scoreMap[k] > bestCount) { bestKey = k; bestCount = scoreMap[k]; }
-    else if (scoreMap[k] === bestCount && bestKey) {
-      var kW = winner === 'a' ? parseInt(k.split('-')[1]) : parseInt(k.split('-')[0]);
-      var bW = winner === 'a' ? parseInt(bestKey.split('-')[1]) : parseInt(bestKey.split('-')[0]);
-      if (kW > bW) bestKey = k;
-    }
-  });
-  if (!bestKey) return { a: 10, b: 9, winner: winner };
-  var parts = bestKey.split('-');
-  return { a: parseInt(parts[0]), b: parseInt(parts[1]), winner: winner };
+  if (aWins / total <= 0.5 && bWins / total <= 0.5) return { a: 10, b: 10, winner: 'even' };
+  var winner = aWins > bWins ? 'a' : 'b';
+  var ws = roundScores.filter(function(r) { return winner === 'a' ? r.score_a > r.score_b : r.score_b > r.score_a; });
+  var sm = {};
+  ws.forEach(function(r) { var k = r.score_a + '-' + r.score_b; sm[k] = (sm[k]||0)+1; });
+  var bk = Object.keys(sm).reduce(function(a,b) { return sm[a] >= sm[b] ? a : b; });
+  var p = bk.split('-');
+  return { a: parseInt(p[0]), b: parseInt(p[1]), winner: winner };
 }
 
 async function loadEmbeddedDashboard() {
-  var eventName = document.getElementById('dash-event-select')?.value;
+  var eventName = document.getElementById('dash-event-select') ? document.getElementById('dash-event-select').value : '';
+  var grid = document.getElementById('dash-fights-grid');
+  var statsBar = document.getElementById('dash-stats-bar');
+  var refreshLabel = document.getElementById('dash-refresh-label');
   if (!eventName) {
-    document.getElementById('dash-fights-grid').innerHTML = '<div class="dash-no-event">Select an event above to load the dashboard</div>';
-    document.getElementById('dash-stats-bar').style.display = 'none';
-    document.getElementById('dash-refresh-info').style.display = 'none';
+    if (grid) grid.innerHTML = '<div style="padding:60px;text-align:center;color:var(--sub);font-size:14px;">Select an event above to load the dashboard</div>';
+    if (statsBar) statsBar.style.display = 'none';
+    if (refreshLabel) refreshLabel.style.display = 'none';
     if (dashRefreshTimer) { clearInterval(dashRefreshTimer); dashRefreshTimer = null; }
     return;
   }
-
-  // Setup auto-refresh
-  if (dashRefreshTimer) clearInterval(dashRefreshTimer);
-  dashRefreshTimer = setInterval(loadEmbeddedDashboard, 5000);
-
+  if (!dashRefreshTimer) dashRefreshTimer = setInterval(loadEmbeddedDashboard, 5000);
   try {
-    var fightsRes = await db
-      .from('fights_with_status')
-      .select('*, fighter_a:fighters!fights_fighter_a_id_fkey(*), fighter_b:fighters!fights_fighter_b_id_fkey(*), broadcaster:broadcasters(name, logo_url)')
-      .eq('event_name', eventName)
-      .order('fight_date', { ascending: true });
-
+    var fightsRes = await db.from('fights_with_status')
+      .select('*, fighter_a:fighters!fights_fighter_a_id_fkey(*), fighter_b:fighters!fights_fighter_b_id_fkey(*)')
+      .eq('event_name', eventName).order('fight_date', { ascending: true });
     if (!fightsRes.data || !fightsRes.data.length) {
-      document.getElementById('dash-fights-grid').innerHTML = '<div class="dash-no-event">No fights found for this event.</div>';
+      grid.innerHTML = '<div style="padding:60px;text-align:center;color:var(--sub);">No fights found.</div>';
       return;
     }
-
     var fights = fightsRes.data;
     var fightIds = fights.map(function(f) { return f.id; });
-
-    var scorecardsRes = await db
-      .from('scorecards')
-      .select('id, fight_id, user_id, total_a, total_b, rounds(round_number, score_a, score_b)')
-      .in('fight_id', fightIds);
-
-    var allScorecards = scorecardsRes.data || [];
-    var scorecardsByFight = {};
-    fightIds.forEach(function(id) { scorecardsByFight[id] = []; });
-    allScorecards.forEach(function(sc) {
-      if (scorecardsByFight[sc.fight_id]) scorecardsByFight[sc.fight_id].push(sc);
-    });
-
-    // Stats
-    var uniqueJudges = new Set(allScorecards.map(function(s) { return s.user_id; })).size;
-    var mostScored = fights.reduce(function(best, f) {
-      var count = (scorecardsByFight[f.id] || []).length;
-      return count > (best.count || 0) ? { name: f.fighter_a.name.split(' ').pop() + ' vs ' + f.fighter_b.name.split(' ').pop(), count: count } : best;
+    var scRes = await db.from('scorecards').select('id,fight_id,user_id,total_a,total_b,rounds(round_number,score_a,score_b)').in('fight_id', fightIds);
+    var allCards = scRes.data || [];
+    var byFight = {};
+    fightIds.forEach(function(id) { byFight[id] = []; });
+    allCards.forEach(function(sc) { if (byFight[sc.fight_id]) byFight[sc.fight_id].push(sc); });
+    var uniqueJudges = new Set(allCards.map(function(s){return s.user_id;})).size;
+    var mostScored = fights.reduce(function(best,f) {
+      var c = (byFight[f.id]||[]).length;
+      return c > (best.c||0) ? { name: f.fighter_a.name.split(' ').pop()+' vs '+f.fighter_b.name.split(' ').pop(), c:c } : best;
     }, {});
+    document.getElementById('dash-stat-sc').textContent = allCards.length;
+    document.getElementById('dash-stat-jd').textContent = uniqueJudges;
+    document.getElementById('dash-stat-ms').textContent = mostScored.name || '—';
+    document.getElementById('dash-stat-ft').textContent = fights.length;
+    statsBar.style.display = 'grid';
+    refreshLabel.style.display = 'block';
 
-    document.getElementById('dash-total-scorecards').textContent = allScorecards.length;
-    document.getElementById('dash-total-judges').textContent = uniqueJudges;
-    document.getElementById('dash-most-scored').textContent = mostScored.name || '—';
-    document.getElementById('dash-total-fights').textContent = fights.length;
-    document.getElementById('dash-stats-bar').style.display = 'grid';
-    document.getElementById('dash-refresh-info').style.display = 'block';
-
-    // Render fights
     var html = '';
     fights.forEach(function(fight) {
-      var cards = scorecardsByFight[fight.id] || [];
-      var fAname = fight.fighter_a?.name || 'Fighter A';
-      var fBname = fight.fighter_b?.name || 'Fighter B';
-      var fAshort = fAname.split(' ').pop().toUpperCase();
-      var fBshort = fBname.split(' ').pop().toUpperCase();
-      var fAphoto = fight.fighter_a?.avatar_url;
-      var fBphoto = fight.fighter_b?.avatar_url;
-      var fArecord = fight.fighter_a?.record || '';
-      var fBrecord = fight.fighter_b?.record || '';
+      var cards = byFight[fight.id] || [];
+      var fAn = fight.fighter_a ? fight.fighter_a.name : 'Fighter A';
+      var fBn = fight.fighter_b ? fight.fighter_b.name : 'Fighter B';
+      var fAs = fAn.split(' ').pop().toUpperCase();
+      var fBs = fBn.split(' ').pop().toUpperCase();
       var status = fight.auto_status || fight.status;
       var hasData = cards.length > 0;
-
-      // Status pill
-      var statusHtml = '';
-      if (status === 'live') statusHtml = '<span class="dash-status-pill dash-status-live">● LIVE</span>';
-      else if (status === 'completed') statusHtml = '<span class="dash-status-pill dash-status-completed">✓ COMPLETED</span>';
-      else statusHtml = '<span class="dash-status-pill dash-status-upcoming">UPCOMING</span>';
-
-      // Build round totals
-      var roundTotals = {};
-      cards.forEach(function(card) {
-        if (card.rounds) {
-          card.rounds.forEach(function(r) {
-            if (!roundTotals[r.round_number]) roundTotals[r.round_number] = [];
-            roundTotals[r.round_number].push(r);
-          });
-        }
+      var rt = {};
+      cards.forEach(function(c) {
+        (c.rounds||[]).forEach(function(r) {
+          if (!rt[r.round_number]) rt[r.round_number] = [];
+          rt[r.round_number].push(r);
+        });
       });
-
-      // Calculate display totals using majority score
-      var displayA = 0, displayB = 0, displayCount = 0;
-      Object.keys(roundTotals).forEach(function(rn) {
-        var rs = dashGetRoundScore(roundTotals[rn]);
-        if (rs) { displayA += rs.a; displayB += rs.b; displayCount++; }
+      var dA=0,dB=0,dc=0;
+      Object.keys(rt).forEach(function(rn) { var rs=dashGetRoundScore(rt[rn]); if(rs){dA+=rs.a;dB+=rs.b;dc++;} });
+      var tot=cards.length,aW=0,bW=0;
+      cards.forEach(function(c){
+        var ca=c.total_a!=null?c.total_a:(c.rounds||[]).reduce(function(s,r){return s+r.score_a;},0);
+        var cb=c.total_b!=null?c.total_b:(c.rounds||[]).reduce(function(s,r){return s+r.score_b;},0);
+        if(ca>cb)aW++;else if(cb>ca)bW++;
       });
-
-      // Consensus
-      var total = cards.length;
-      var aWins = cards.filter(function(c) {
-        var ca = c.total_a != null ? c.total_a : (c.rounds||[]).reduce(function(s,r){return s+r.score_a},0);
-        var cb = c.total_b != null ? c.total_b : (c.rounds||[]).reduce(function(s,r){return s+r.score_b},0);
-        return ca > cb;
-      }).length;
-      var bWins = cards.filter(function(c) {
-        var ca = c.total_a != null ? c.total_a : (c.rounds||[]).reduce(function(s,r){return s+r.score_a},0);
-        var cb = c.total_b != null ? c.total_b : (c.rounds||[]).reduce(function(s,r){return s+r.score_b},0);
-        return cb > ca;
-      }).length;
-      var draws = total - aWins - bWins;
-      var aPct = total > 0 ? Math.round(aWins / total * 100) : 0;
-      var bPct = total > 0 ? Math.round(bWins / total * 100) : 0;
-      var dPct = total > 0 ? Math.round(draws / total * 100) : 0;
-
-      // Fighter photos
-      var photoA = fAphoto
-        ? '<img src="' + fAphoto + '" class="dash-fighter-photo dash-fighter-photo-a" onerror="this.style.display='none'"/>'
-        : '<div class="dash-fighter-placeholder dash-fighter-placeholder-a">' + fAshort[0] + '</div>';
-      var photoB = fBphoto
-        ? '<img src="' + fBphoto + '" class="dash-fighter-photo dash-fighter-photo-b" onerror="this.style.display='none'"/>'
-        : '<div class="dash-fighter-placeholder dash-fighter-placeholder-b">' + fBshort[0] + '</div>';
-
-      // Consensus bar
-      var barHtml = '';
-      if (!hasData) {
-        barHtml = '<div class="dash-consensus-bar-track"><div style="flex:1;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--sub)">No scores yet</div></div>';
-      } else if (aPct === 0 && bPct === 0) {
-        barHtml = '<div class="dash-consensus-bar-track"><div style="flex:1;background:var(--gold);display:flex;align-items:center;justify-content:center;"><span class="dash-bar-label">ALL EVEN</span></div></div>';
-      } else {
-        barHtml = '<div class="dash-consensus-bar-track">';
-        if (aPct > 0) barHtml += '<div class="dash-bar-a" style="width:' + aPct + '%"><span class="dash-bar-label">' + (aPct > 15 ? fAshort + ' ' + aPct + '%' : '') + '</span></div>';
-        if (bPct > 0) barHtml += '<div class="dash-bar-b" style="width:' + bPct + '%"><span class="dash-bar-label">' + (bPct > 15 ? bPct + '% ' + fBshort : '') + '</span></div>';
-        barHtml += '</div>';
+      var aPct=tot>0?Math.round(aW/tot*100):0;
+      var bPct=tot>0?Math.round(bW/tot*100):0;
+      var dPct=tot>0?Math.round((tot-aW-bW)/tot*100):0;
+      var sPill=status==='live'?'<span style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:10px;background:rgba(232,0,29,0.15);color:var(--red);border:0.5px solid rgba(232,0,29,0.4);">● LIVE</span>':status==='completed'?'<span style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:10px;background:rgba(34,197,94,0.1);color:var(--green);border:0.5px solid rgba(34,197,94,0.3);">✓ COMPLETED</span>':'<span style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:10px;background:rgba(148,148,160,0.1);color:var(--sub);">UPCOMING</span>';
+      function mkPhoto(url,side,init){return url?'<img src="'+url+'" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid var(--'+side+');" onerror="this.style.display='none'"/>':'<div style="width:48px;height:48px;border-radius:50%;background:var(--mid);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;border:2px solid var(--'+side+');color:var(--'+side+');">'+init+'</div>';}
+      var barH;
+      if(!hasData){barH='<div style="height:26px;border-radius:8px;background:var(--mid);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--sub);">No scores yet</div>';}
+      else if(aPct===0&&bPct===0){barH='<div style="height:26px;border-radius:8px;background:var(--gold);display:flex;align-items:center;justify-content:center;"><span style="font-size:11px;font-weight:700;color:white;">ALL EVEN</span></div>';}
+      else{barH='<div style="height:26px;border-radius:8px;overflow:hidden;display:flex;background:var(--mid);">';if(aPct>0)barH+='<div style="width:'+aPct+'%;background:var(--red);display:flex;align-items:center;padding-left:8px;"><span style="font-size:11px;font-weight:700;color:white;white-space:nowrap;">'+(aPct>15?fAs+' '+aPct+'%':'')+'</span></div>';if(bPct>0)barH+='<div style="width:'+bPct+'%;background:var(--blue);display:flex;align-items:center;justify-content:flex-end;padding-right:8px;"><span style="font-size:11px;font-weight:700;color:white;white-space:nowrap;">'+(bPct>15?bPct+'% '+fBs:'')+'</span></div>';barH+='</div>';}
+      var offH=fight.result_winner?'<div style="margin:0 16px 12px;background:rgba(34,197,94,0.08);border:0.5px solid rgba(34,197,94,0.3);border-radius:8px;padding:8px 12px;text-align:center;font-size:12px;font-weight:700;color:var(--green);">✓ OFFICIAL: '+fight.result_winner.toUpperCase()+(fight.result_method?' · '+fight.result_method:'')+'</div>':'';
+      var rKeys=Object.keys(rt).map(Number).sort(function(a,b){return a-b;});
+      var tH='';
+      if(rKeys.length){
+        tH+='<div style="padding:0 16px 16px;"><div style="font-size:10px;font-weight:700;color:var(--sub);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Viewers Verdict · Round by Round</div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr><th style="text-align:left;padding:5px 4px;font-size:9px;font-weight:700;color:var(--sub);border-bottom:0.5px solid var(--mid);min-width:65px;"></th>';
+        for(var ri=1;ri<=(fight.scheduled_rounds||12);ri++){tH+='<th style="padding:5px 4px;text-align:center;font-size:9px;font-weight:700;color:var(--sub);border-bottom:0.5px solid var(--mid);min-width:22px;">R'+ri+'</th>';}
+        tH+='<th style="padding:5px 8px;text-align:center;font-size:9px;font-weight:700;color:var(--sub);border-bottom:0.5px solid var(--mid);border-left:0.5px solid var(--mid);">AVG</th></tr></thead><tbody>';
+        var tA=0,tAc=0;
+        tH+='<tr><td style="font-size:11px;color:var(--sub);font-weight:600;padding:5px 4px;">'+fAs+'</td>';
+        for(var ri=1;ri<=(fight.scheduled_rounds||12);ri++){var rS=rt[ri]||[];if(rS.length){var rs=dashGetRoundScore(rS);var bg=rs.winner==='a'?'background:rgba(232,0,29,0.12);color:var(--red);':rs.winner==='even'?'background:rgba(201,168,76,0.12);color:var(--gold);':'';tH+='<td style="padding:5px 4px;text-align:center;font-size:12px;font-weight:700;border-bottom:0.5px solid rgba(42,42,47,0.4);border-radius:4px;'+bg+'">'+rs.a+'</td>';tA+=rs.a;tAc++;}else{tH+='<td style="padding:5px 4px;text-align:center;color:var(--mid);">—</td>';}}
+        tH+='<td style="padding:5px 8px;text-align:center;font-size:14px;font-weight:900;color:var(--red);border-left:0.5px solid var(--mid);">'+(tAc>0?tA:'—')+'</td></tr>';
+        var tB=0,tBc=0;
+        tH+='<tr><td style="font-size:11px;color:var(--sub);font-weight:600;padding:5px 4px;">'+fBs+'</td>';
+        for(var ri=1;ri<=(fight.scheduled_rounds||12);ri++){var rS=rt[ri]||[];if(rS.length){var rs=dashGetRoundScore(rS);var bg=rs.winner==='b'?'background:rgba(95,168,232,0.12);color:var(--blue);':rs.winner==='even'?'background:rgba(201,168,76,0.12);color:var(--gold);':'';tH+='<td style="padding:5px 4px;text-align:center;font-size:12px;font-weight:700;border-bottom:0.5px solid rgba(42,42,47,0.4);border-radius:4px;'+bg+'">'+rs.b+'</td>';tB+=rs.b;tBc++;}else{tH+='<td style="padding:5px 4px;text-align:center;color:var(--mid);">—</td>';}}
+        tH+='<td style="padding:5px 8px;text-align:center;font-size:14px;font-weight:900;color:var(--blue);border-left:0.5px solid var(--mid);">'+(tBc>0?tB:'—')+'</td></tr>';
+        tH+='</tbody></table></div></div>';
       }
-
-      // Official result
-      var officialHtml = '';
-      if (fight.result_winner) {
-        officialHtml = '<div class="dash-official-result"><div class="dash-official-result-txt">✓ OFFICIAL: ' + fight.result_winner.toUpperCase() + (fight.result_method ? ' · ' + fight.result_method : '') + '</div></div>';
-      }
-
-      // Viewers Verdict table
-      var tableHtml = '';
-      var roundKeys = Object.keys(roundTotals).map(Number).sort(function(a,b){return a-b});
-      if (roundKeys.length > 0) {
-        tableHtml += '<div class="dash-scorecard-table-section">';
-        tableHtml += '<div class="dash-scorecard-table-label"><span class="d-tooltip-wrap">Viewers\' Verdict · Round by Round<i class="d-tooltip-icon">?</i><span class="d-tooltip-box">Built round by round using the <strong>majority winner</strong> of each round. A round with no clear majority defaults to 10-10.</span></span></div>';
-        tableHtml += '<div style="overflow-x:auto"><table class="dash-scorecard-table"><thead><tr><th></th>';
-        for (var ri = 1; ri <= fight.scheduled_rounds; ri++) {
-          tableHtml += '<th>R' + ri + '</th>';
-        }
-        tableHtml += '<th style="border-left:0.5px solid var(--mid);padding-left:8px">AVG</th></tr></thead><tbody>';
-
-        // Fighter A row
-        tableHtml += '<tr><td>' + fAshort + '</td>';
-        var tA = 0, tAc = 0;
-        for (var ri = 1; ri <= fight.scheduled_rounds; ri++) {
-          var rScores = roundTotals[ri] || [];
-          if (rScores.length) {
-            var rs = dashGetRoundScore(rScores);
-            var cls = rs.winner === 'a' ? 'd-won-a' : rs.winner === 'even' ? 'd-won-even' : '';
-            tableHtml += '<td class="' + cls + '">' + rs.a + '</td>';
-            tA += rs.a; tAc++;
-          } else { tableHtml += '<td class="d-empty">—</td>'; }
-        }
-        tableHtml += '<td class="d-total-col dash-total-a">' + (tAc > 0 ? tA : '—') + '</td></tr>';
-
-        // Fighter B row
-        tableHtml += '<tr><td>' + fBshort + '</td>';
-        var tB = 0, tBc = 0;
-        for (var ri = 1; ri <= fight.scheduled_rounds; ri++) {
-          var rScores = roundTotals[ri] || [];
-          if (rScores.length) {
-            var rs = dashGetRoundScore(rScores);
-            var cls = rs.winner === 'b' ? 'd-won-b' : rs.winner === 'even' ? 'd-won-even' : '';
-            tableHtml += '<td class="' + cls + '">' + rs.b + '</td>';
-            tB += rs.b; tBc++;
-          } else { tableHtml += '<td class="d-empty">—</td>'; }
-        }
-        tableHtml += '<td class="d-total-col dash-total-b">' + (tBc > 0 ? tB : '—') + '</td></tr>';
-
-        tableHtml += '</tbody></table></div></div>';
-      }
-
-      html += '<div class="dash-fight-card' + (hasData ? ' has-data' : '') + '">';
-      html += '<div class="dash-fight-header"><span class="dash-fight-weight">' + (fight.weight_class || '') + '</span>' + statusHtml + '</div>';
-      html += '<div class="dash-fighters-row">';
-      html += '<div class="dash-fighter">' + photoA + '<div class="dash-fighter-name">' + fAname + '</div>' + (fArecord ? '<div class="dash-fighter-record">' + fArecord + '</div>' : '') + '<div class="dash-fighter-score dash-score-a">' + (displayCount > 0 ? displayA : '—') + '</div></div>';
-      html += '<div class="dash-vs-col"><div class="dash-vs-txt">VS</div><div class="dash-rounds-txt">' + (fight.scheduled_rounds || 12) + 'R</div></div>';
-      html += '<div class="dash-fighter">' + photoB + '<div class="dash-fighter-name">' + fBname + '</div>' + (fBrecord ? '<div class="dash-fighter-record">' + fBrecord + '</div>' : '') + '<div class="dash-fighter-score dash-score-b">' + (displayCount > 0 ? displayB : '—') + '</div></div>';
-      html += '</div>';
-      html += officialHtml;
-      html += '<div class="dash-consensus-section"><div class="dash-consensus-header"><span class="dash-consensus-label"><span class="d-tooltip-wrap">Community Consensus<i class="d-tooltip-icon">?</i><span class="d-tooltip-box">The % of judges who have each fighter <strong>winning overall</strong>. One vote per judge.</span></span></span><span class="dash-consensus-count">' + total + ' judge' + (total !== 1 ? 's' : '') + '</span></div>';
-      html += barHtml;
-      if (hasData && total > 0) {
-        html += '<div class="dash-consensus-pct"><span class="dash-pct-a">' + fAshort + ' ' + aPct + '%</span>';
-        if (dPct > 0) html += '<span style="font-size:13px;font-weight:700;color:var(--gold);">Draw ' + dPct + '%</span>';
-        html += '<span class="dash-pct-b">' + bPct + '% ' + fBshort + '</span></div>';
-      }
-      html += '</div>';
-      html += tableHtml || '<div class="dash-no-data">Waiting for judges to score this fight...</div>';
-      html += '</div>';
+      html+='<div style="background:var(--black);border:0.5px solid '+(hasData?'rgba(232,0,29,0.25)':'var(--mid)')+';border-radius:14px;overflow:hidden;">';
+      html+='<div style="padding:12px 16px;border-bottom:0.5px solid var(--mid);display:flex;align-items:center;justify-content:space-between;"><span style="font-size:11px;font-weight:700;color:var(--sub);letter-spacing:1px;text-transform:uppercase;">'+(fight.weight_class||'')+'</span>'+sPill+'</div>';
+      html+='<div style="display:flex;align-items:center;padding:16px;gap:10px;">';
+      html+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;">'+mkPhoto(fight.fighter_a?fight.fighter_a.avatar_url:null,'red',fAs[0])+'<div style="font-size:13px;font-weight:700;color:var(--text);">'+fAn+'</div>'+(fight.fighter_a&&fight.fighter_a.record?'<div style="font-size:11px;color:var(--sub);">'+fight.fighter_a.record+'</div>':'')+'<div style="font-size:36px;font-weight:900;color:var(--red);">'+(dc>0?dA:'—')+'</div></div>';
+      html+='<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;"><div style="font-size:12px;font-weight:700;color:var(--sub);">VS</div><div style="font-size:11px;color:var(--sub);">'+(fight.scheduled_rounds||12)+'R</div></div>';
+      html+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;">'+mkPhoto(fight.fighter_b?fight.fighter_b.avatar_url:null,'blue',fBs[0])+'<div style="font-size:13px;font-weight:700;color:var(--text);">'+fBn+'</div>'+(fight.fighter_b&&fight.fighter_b.record?'<div style="font-size:11px;color:var(--sub);">'+fight.fighter_b.record+'</div>':'')+'<div style="font-size:36px;font-weight:900;color:var(--blue);">'+(dc>0?dB:'—')+'</div></div></div>';
+      html+=offH;
+      html+='<div style="padding:0 16px 12px;"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><span style="font-size:10px;font-weight:700;color:var(--sub);letter-spacing:1px;text-transform:uppercase;">Community Consensus</span><span style="font-size:12px;color:var(--sub);">'+tot+' judge'+(tot!==1?'s':'')+'</span></div>'+barH;
+      if(hasData&&tot>0){html+='<div style="display:flex;justify-content:space-between;margin-top:6px;"><span style="font-size:13px;font-weight:700;color:var(--red);">'+fAs+' '+aPct+'%</span>'+(dPct>0?'<span style="font-size:13px;font-weight:700;color:var(--gold);">Draw '+dPct+'%</span>':'')+'<span style="font-size:13px;font-weight:700;color:var(--blue);">'+bPct+'% '+fBs+'</span></div>';}
+      html+='</div>';
+      html+=tH||'<div style="padding:20px;text-align:center;color:var(--sub);font-size:13px;">Waiting for judges to score this fight...</div>';
+      html+='</div>';
     });
-
-    document.getElementById('dash-fights-grid').innerHTML = html;
-
-  } catch(e) { console.error('Dashboard error:', e); }
+    grid.innerHTML = html;
+  } catch(e) { console.error('Dashboard error:', e); if(grid) grid.innerHTML = '<div style="padding:40px;text-align:center;color:var(--red);">Error: '+e.message+'</div>'; }
 }
-
 </script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -358,76 +256,6 @@ async function loadEmbeddedDashboard() {
   #admin-lock input:focus { border-color: var(--red); }
   #admin-lock button { background: var(--red); color: white; border: none; border-radius: 10px; padding: 14px 40px; font-size: 14px; font-weight: 700; cursor: pointer; letter-spacing: 1px; width: 280px; }
   #admin-lock .lock-error { color: var(--red); font-size: 13px; display: none; }
-
-/* ── EMBEDDED DASHBOARD ─────────────────────────────── */
-.dash-event-select { width:100%; background:var(--black); border:0.5px solid #3A3A3F; border-radius:10px; padding:12px 16px; color:var(--text); font-size:14px; outline:none; margin-bottom:20px; cursor:pointer; }
-.dash-stats-bar { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--mid); border-radius:12px; overflow:hidden; margin-bottom:20px; }
-.dash-stat-box { background:var(--gray); padding:16px; text-align:center; }
-.dash-stat-num { font-size:28px; font-weight:900; color:var(--text); line-height:1; margin-bottom:4px; }
-.dash-stat-label { font-size:10px; font-weight:600; color:var(--sub); letter-spacing:0.8px; text-transform:uppercase; }
-.dash-fights-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(520px,1fr)); gap:16px; }
-.dash-fight-card { background:var(--black); border:0.5px solid var(--mid); border-radius:14px; overflow:hidden; }
-.dash-fight-card.has-data { border-color:rgba(232,0,29,0.25); }
-.dash-fight-header { padding:12px 18px; border-bottom:0.5px solid var(--mid); display:flex; align-items:center; justify-content:space-between; }
-.dash-fight-weight { font-size:11px; font-weight:700; color:var(--sub); letter-spacing:1px; text-transform:uppercase; }
-.dash-status-pill { font-size:10px; font-weight:700; padding:4px 10px; border-radius:10px; letter-spacing:0.5px; }
-.dash-status-live { background:rgba(232,0,29,0.15); color:var(--red); border:0.5px solid rgba(232,0,29,0.4); }
-.dash-status-upcoming { background:rgba(148,148,160,0.1); color:var(--sub); }
-.dash-status-completed { background:rgba(34,197,94,0.1); color:var(--green); border:0.5px solid rgba(34,197,94,0.3); }
-.dash-fighters-row { display:flex; align-items:center; padding:16px 18px; gap:10px; }
-.dash-fighter { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; }
-.dash-fighter-photo { width:48px; height:48px; border-radius:50%; object-fit:cover; border:2px solid var(--mid); }
-.dash-fighter-photo-a { border-color:var(--red); }
-.dash-fighter-photo-b { border-color:var(--blue); }
-.dash-fighter-placeholder { width:48px; height:48px; border-radius:50%; background:var(--mid); display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:900; border:2px solid var(--mid); }
-.dash-fighter-placeholder-a { border-color:var(--red); color:var(--red); }
-.dash-fighter-placeholder-b { border-color:var(--blue); color:var(--blue); }
-.dash-fighter-name { font-size:13px; font-weight:700; color:var(--text); }
-.dash-fighter-record { font-size:11px; color:var(--sub); }
-.dash-fighter-score { font-size:36px; font-weight:900; line-height:1; }
-.dash-score-a { color:var(--red); }
-.dash-score-b { color:var(--blue); }
-.dash-vs-col { display:flex; flex-direction:column; align-items:center; gap:4px; flex-shrink:0; }
-.dash-vs-txt { font-size:12px; font-weight:700; color:var(--sub); }
-.dash-rounds-txt { font-size:11px; color:var(--sub); }
-.dash-consensus-section { padding:0 18px 14px; }
-.dash-consensus-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
-.dash-consensus-label { font-size:10px; font-weight:700; color:var(--sub); letter-spacing:1px; text-transform:uppercase; }
-.dash-consensus-count { font-size:12px; color:var(--sub); }
-.dash-consensus-bar-track { height:26px; border-radius:8px; overflow:hidden; background:var(--mid); display:flex; }
-.dash-bar-a { height:100%; display:flex; align-items:center; padding-left:8px; background:var(--red); }
-.dash-bar-b { height:100%; display:flex; align-items:center; justify-content:flex-end; padding-right:8px; background:var(--blue); }
-.dash-bar-label { font-size:11px; font-weight:700; color:white; white-space:nowrap; }
-.dash-consensus-pct { display:flex; justify-content:space-between; margin-top:6px; }
-.dash-pct-a { font-size:13px; font-weight:700; color:var(--red); }
-.dash-pct-b { font-size:13px; font-weight:700; color:var(--blue); }
-.dash-official-result { margin:0 18px 14px; background:rgba(34,197,94,0.08); border:0.5px solid rgba(34,197,94,0.3); border-radius:8px; padding:10px 14px; text-align:center; }
-.dash-official-result-txt { font-size:13px; font-weight:700; color:var(--green); letter-spacing:0.5px; }
-.dash-no-data { padding:20px 18px; text-align:center; color:var(--sub); font-size:13px; }
-.dash-scorecard-table-section { padding:0 18px 18px; }
-.dash-scorecard-table-label { font-size:10px; font-weight:700; color:var(--sub); letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; }
-.dash-scorecard-table { width:100%; border-collapse:collapse; font-size:12px; }
-.dash-scorecard-table th { padding:6px 5px; text-align:center; font-size:9px; font-weight:700; color:var(--sub); letter-spacing:0.5px; border-bottom:0.5px solid var(--mid); min-width:24px; }
-.dash-scorecard-table th:first-child { text-align:left; padding-left:0; min-width:70px; }
-.dash-scorecard-table td { padding:6px 5px; text-align:center; font-size:12px; font-weight:700; border-bottom:0.5px solid rgba(42,42,47,0.4); }
-.dash-scorecard-table td:first-child { text-align:left; padding-left:0; font-size:11px; color:var(--sub); font-weight:600; }
-.dash-scorecard-table tr:last-child td { border-bottom:none; }
-.dash-scorecard-table td.d-won-a { background:rgba(232,0,29,0.12); color:var(--red); border-radius:4px; }
-.dash-scorecard-table td.d-won-b { background:rgba(95,168,232,0.12); color:var(--blue); border-radius:4px; }
-.dash-scorecard-table td.d-won-even { background:rgba(201,168,76,0.12); color:var(--gold); border-radius:4px; }
-.dash-scorecard-table td.d-empty { color:var(--mid); }
-.dash-scorecard-table .d-total-col { font-size:14px; font-weight:900; border-left:0.5px solid var(--mid); padding-left:8px; }
-.dash-total-a { color:var(--red); }
-.dash-total-b { color:var(--blue); }
-.dash-no-event { padding:60px 20px; text-align:center; color:var(--sub); font-size:14px; }
-.dash-refresh-info { font-size:11px; color:var(--sub); text-align:center; padding:12px; }
-/* Tooltip */
-.d-tooltip-wrap { position:relative; display:inline-flex; align-items:center; gap:4px; }
-.d-tooltip-icon { width:13px; height:13px; border-radius:50%; background:var(--mid); border:0.5px solid #3A3A3F; display:inline-flex; align-items:center; justify-content:center; font-size:8px; color:var(--sub); cursor:help; flex-shrink:0; font-style:normal; }
-.d-tooltip-box { display:none; position:absolute; bottom:calc(100% + 6px); left:0; background:#111; border:0.5px solid var(--mid); border-radius:8px; padding:8px 10px; font-size:11px; color:var(--sub); line-height:1.6; width:220px; z-index:500; pointer-events:none; }
-.d-tooltip-box strong { color:var(--text); }
-.d-tooltip-wrap:hover .d-tooltip-box { display:block; }
-
 </style>
 </head>
 <body>
@@ -446,15 +274,15 @@ async function loadEmbeddedDashboard() {
 
 <!-- NAV TABS -->
 <div class="nav-tabs">
-  <button class="tab-btn active" onclick="showTab('fights')">🥊 Fights</button>
-  <button class="tab-btn" onclick="showTab('fighters')">👊 Fighters</button>
-  <button class="tab-btn" onclick="showTab('broadcasters')">📺 Broadcasters</button>
-  <button class="tab-btn" onclick="showTab('users')">👥 Users</button>
-  <button class="tab-btn" onclick="showTab('scorecards')">📋 Scorecards</button>
-  <button class="tab-btn" onclick="showTab('notifications')">🔔 Notifications</button>
-  <button class="tab-btn" onclick="showTab('reports')">🚨 Reports</button>
-  <button class="tab-btn" onclick="showTab('ads')">📢 Ads</button>
-  <button class="tab-btn" onclick="showTab('dashboard')">📊 Dashboard</button>
+  <button class="tab-btn active" onclick="showTab('fights', this)">🥊 Fights</button>
+  <button class="tab-btn" onclick="showTab('fighters', this)">👊 Fighters</button>
+  <button class="tab-btn" onclick="showTab('broadcasters', this)">📺 Broadcasters</button>
+  <button class="tab-btn" onclick="showTab('users', this)">👥 Users</button>
+  <button class="tab-btn" onclick="showTab('scorecards', this)">📋 Scorecards</button>
+  <button class="tab-btn" onclick="showTab('notifications', this)">🔔 Notifications</button>
+  <button class="tab-btn" onclick="showTab('reports', this)">🚨 Reports</button>
+  <button class="tab-btn" onclick="showTab('ads', this)">📢 Ads</button>
+  <button class="tab-btn" onclick="showTab('dashboard', this)">📊 Dashboard</button>
 </div>
 
 <!-- ═══════════════════════════════════ -->
@@ -550,9 +378,7 @@ async function loadEmbeddedDashboard() {
       <div><div class="card-title">📸 Fighter Photos & Records</div><div class="card-sub">Fetches Wikipedia photos and records for fighters missing data</div></div>
       <button class="btn btn-gold" id="photosBtn" onclick="fetchFighterData()">FETCH MISSING</button>
     </div>
-    <div class="card-body"><div id="photosMsg"></div><div style="margin-bottom:16px;">
-        <input id="fighter-search" placeholder="🔍 Search fighters..." oninput="filterFighters()" style="width:100%;background:var(--black);border:0.5px solid #3A3A3F;border-radius:10px;padding:12px 16px;color:var(--text);font-size:14px;outline:none;"/>
-      </div>
+    <div class="card-body"><div id="photosMsg"></div><div style="margin-bottom:16px;"><input id="fighter-search" placeholder="🔍 Search fighters..." oninput="filterFighters()" style="width:100%;background:var(--black);border:0.5px solid #3A3A3F;border-radius:10px;padding:12px 16px;color:var(--text);font-size:14px;outline:none;"/></div>
       <div id="fightersList"></div></div>
   </div>
 
@@ -901,14 +727,14 @@ if (sessionStorage.getItem('rc_admin') === '1') {
 }
 
 // ── TABS ──────────────────────────────────────────────────────
-function showTab(tab) {
+function showTab(tab, btn) {
   if (tab === 'broadcasters') { setTimeout(loadBroadcasters, 50); }
   if (tab === 'ads') { setTimeout(loadAds, 50); }
-  if (tab === 'dashboard') { setTimeout(loadDashEventList, 50); if (dashRefreshTimer) { clearInterval(dashRefreshTimer); dashRefreshTimer = null; } }
+  if (tab === 'dashboard') { setTimeout(loadDashEventList, 50); if (typeof dashRefreshTimer !== 'undefined' && dashRefreshTimer) { clearInterval(dashRefreshTimer); dashRefreshTimer = null; } }
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('panel-' + tab).classList.add('active');
-  event.target.classList.add('active');
+  if (btn) btn.classList.add('active');
 }
 
 function init() {
@@ -1655,67 +1481,38 @@ if (sessionStorage.getItem('rc_admin') === '1') init();
   </div>
 </div>
 
-
 <div class="panel" id="panel-dashboard">
   <div class="card">
     <div class="card-header">
-      <div><div class="card-title">📊 Event Dashboard</div><div class="card-sub">Live fan scoring data by event. Refreshes every 5 seconds.</div></div>
+      <div><div class="card-title">📊 Event Dashboard</div><div class="card-sub">Live fan scoring data. Refreshes every 5 seconds when active.</div></div>
       <div style="display:flex;gap:8px;align-items:center;">
         <button class="btn btn-sm" style="background:rgba(201,168,76,0.1);color:var(--gold);border:0.5px solid rgba(201,168,76,0.3);" onclick="document.getElementById('dashMethodModal').style.display='flex'">ℹ️ Methodology</button>
         <button class="btn btn-mid btn-sm" onclick="loadEmbeddedDashboard()">↺ REFRESH</button>
       </div>
     </div>
     <div class="card-body">
-      <select id="dash-event-select" class="dash-event-select" onchange="loadEmbeddedDashboard()">
-        <option value="">Select an event...</option>
-      </select>
-
-      <!-- Stats bar -->
-      <div class="dash-stats-bar" id="dash-stats-bar" style="display:none;">
-        <div class="dash-stat-box"><div class="dash-stat-num" id="dash-total-scorecards">0</div><div class="dash-stat-label">Total Scorecards</div></div>
-        <div class="dash-stat-box"><div class="dash-stat-num" id="dash-total-judges">0</div><div class="dash-stat-label">Unique Judges</div></div>
-        <div class="dash-stat-box"><div class="dash-stat-num" id="dash-most-scored" style="font-size:14px;line-height:1.3;">—</div><div class="dash-stat-label">Most Scored Fight</div></div>
-        <div class="dash-stat-box"><div class="dash-stat-num" id="dash-total-fights">0</div><div class="dash-stat-label">Fights on Card</div></div>
+      <select id="dash-event-select" onchange="loadEmbeddedDashboard()" style="width:100%;background:var(--black);border:0.5px solid #3A3A3F;border-radius:10px;padding:12px 16px;color:var(--text);font-size:14px;outline:none;margin-bottom:20px;cursor:pointer;"><option value="">Select an event...</option></select>
+      <div id="dash-stats-bar" style="display:none;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--mid);border-radius:12px;overflow:hidden;margin-bottom:20px;">
+        <div style="background:var(--gray);padding:16px;text-align:center;"><div id="dash-stat-sc" style="font-size:28px;font-weight:900;color:var(--text);line-height:1;margin-bottom:4px;">0</div><div style="font-size:10px;font-weight:600;color:var(--sub);letter-spacing:0.8px;text-transform:uppercase;">Total Scorecards</div></div>
+        <div style="background:var(--gray);padding:16px;text-align:center;"><div id="dash-stat-jd" style="font-size:28px;font-weight:900;color:var(--text);line-height:1;margin-bottom:4px;">0</div><div style="font-size:10px;font-weight:600;color:var(--sub);letter-spacing:0.8px;text-transform:uppercase;">Unique Judges</div></div>
+        <div style="background:var(--gray);padding:16px;text-align:center;"><div id="dash-stat-ms" style="font-size:14px;font-weight:900;color:var(--text);line-height:1.2;margin-bottom:4px;">—</div><div style="font-size:10px;font-weight:600;color:var(--sub);letter-spacing:0.8px;text-transform:uppercase;">Most Scored Fight</div></div>
+        <div style="background:var(--gray);padding:16px;text-align:center;"><div id="dash-stat-ft" style="font-size:28px;font-weight:900;color:var(--text);line-height:1;margin-bottom:4px;">0</div><div style="font-size:10px;font-weight:600;color:var(--sub);letter-spacing:0.8px;text-transform:uppercase;">Fights on Card</div></div>
       </div>
-
-      <!-- Fights grid -->
-      <div class="dash-fights-grid" id="dash-fights-grid">
-        <div class="dash-no-event">Select an event above to load the dashboard</div>
-      </div>
-
-      <div class="dash-refresh-info" id="dash-refresh-info" style="display:none;">⟳ Auto-refreshing every 5 seconds</div>
+      <div id="dash-fights-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(520px,1fr));gap:16px;"><div style="padding:60px;text-align:center;color:var(--sub);font-size:14px;">Select an event above to load the dashboard</div></div>
+      <div id="dash-refresh-label" style="display:none;font-size:11px;color:var(--sub);text-align:center;padding:12px;">⟳ Auto-refreshing every 5 seconds</div>
     </div>
   </div>
 </div>
-
 <div id="dashMethodModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;align-items:center;justify-content:center;padding:20px;">
   <div style="background:#1A1A1E;border:0.5px solid #2A2A2F;border-radius:16px;padding:32px;max-width:560px;width:100%;max-height:80vh;overflow-y:auto;">
     <div style="font-size:20px;font-weight:900;color:var(--text);margin-bottom:4px;">How Scores Are Calculated</div>
     <div style="font-size:13px;color:var(--sub);margin-bottom:24px;">RoundCard uses real fan scorecards to determine community verdicts.</div>
-
-    <div style="margin-bottom:18px;">
-      <div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Who Scored</div>
-      <p style="font-size:13px;color:var(--sub);line-height:1.7;">Every score comes from a <strong style="color:var(--text)">real registered user</strong> scoring the fight live in RoundCard, round by round, using the same <strong style="color:var(--text)">10-point must system</strong> as the official judges. Scores are locked after each round.</p>
-    </div>
-
-    <div style="margin-bottom:18px;">
-      <div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Who Won the Round</div>
-      <p style="font-size:13px;color:var(--sub);line-height:1.7;">Strictly more than 50% of judges must have a fighter winning for them to win the round. Anything else — ties, three-way splits, 50/50 — defaults to <strong style="color:var(--text)">10-10</strong>.</p>
-    </div>
-
-    <div style="margin-bottom:18px;">
-      <div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">By What Score</div>
-      <p style="font-size:13px;color:var(--sub);line-height:1.7;">From the majority winner's judges, the most commonly submitted score is used. Naturally accounts for knockdowns (10-8) and deductions (9-9).</p>
-    </div>
-
-    <div style="margin-bottom:18px;">
-      <div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Why Numbers May Differ</div>
-      <p style="font-size:13px;color:var(--sub);line-height:1.7;"><strong style="color:var(--text)">Community Consensus</strong> — % of judges who have each fighter winning their overall scorecard.<br/><strong style="color:var(--text)">Viewers' Verdict</strong> — built round by round from majority winners. These can tell different stories; both are valid.</p>
-    </div>
-
+    <div style="margin-bottom:16px;"><div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Who Scored</div><p style="font-size:13px;color:var(--sub);line-height:1.7;">Every score comes from a <strong style="color:var(--text)">real registered user</strong> scoring live in RoundCard using the <strong style="color:var(--text)">10-point must system</strong>.</p></div>
+    <div style="margin-bottom:16px;"><div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Who Won the Round</div><p style="font-size:13px;color:var(--sub);line-height:1.7;">Strictly more than 50% of judges must have a fighter winning. Ties and 50/50 splits default to <strong style="color:var(--text)">10-10</strong>.</p></div>
+    <div style="margin-bottom:16px;"><div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">By What Score</div><p style="font-size:13px;color:var(--sub);line-height:1.7;">The most commonly submitted score among the majority winner's judges. Naturally reflects knockdowns (10-8) and deductions.</p></div>
+    <div style="margin-bottom:16px;"><div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Why Numbers May Differ</div><p style="font-size:13px;color:var(--sub);line-height:1.7;"><strong style="color:var(--text)">Community Consensus</strong> — % with each fighter winning overall.<br/><strong style="color:var(--text)">Viewers Verdict</strong> — built round by round from majority winners. Both valid, can differ.</p></div>
     <button onclick="document.getElementById('dashMethodModal').style.display='none'" style="width:100%;background:var(--red);border:none;border-radius:8px;padding:12px;color:white;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">CLOSE</button>
   </div>
 </div>
-
 </body>
 </html>
