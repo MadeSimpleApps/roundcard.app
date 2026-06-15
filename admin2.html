@@ -4,157 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RoundCard Admin</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-
-// ── FIGHTER SEARCH ────────────────────────────────────────────
-function filterFighters() {
-  var q = (document.getElementById('fighter-search') ? document.getElementById('fighter-search').value : '').toLowerCase();
-  document.querySelectorAll('.fighter-row').forEach(function(row) {
-    row.style.display = (row.getAttribute('data-name') || '').includes(q) ? '' : 'none';
-  });
-}
-
-// ── EMBEDDED DASHBOARD ────────────────────────────────────────
-var dashRefreshTimer = null;
-
-async function loadDashEventList() {
-  var sel = document.getElementById('dash-event-select');
-  if (!sel) return;
-  var res = await db.from('fights').select('event_name').not('event_name', 'is', null).order('fight_date', { ascending: false });
-  if (!res.data) return;
-  var seen = {};
-  var opts = '<option value="">Select an event...</option>';
-  res.data.forEach(function(f) {
-    if (f.event_name && !seen[f.event_name]) {
-      seen[f.event_name] = true;
-      opts += '<option value="' + f.event_name + '">' + f.event_name + '</option>';
-    }
-  });
-  sel.innerHTML = opts;
-}
-
-function dashGetRoundScore(roundScores) {
-  if (!roundScores || !roundScores.length) return null;
-  var total = roundScores.length;
-  var aWins = roundScores.filter(function(r) { return r.score_a > r.score_b; }).length;
-  var bWins = roundScores.filter(function(r) { return r.score_b > r.score_a; }).length;
-  if (aWins / total <= 0.5 && bWins / total <= 0.5) return { a: 10, b: 10, winner: 'even' };
-  var winner = aWins > bWins ? 'a' : 'b';
-  var ws = roundScores.filter(function(r) { return winner === 'a' ? r.score_a > r.score_b : r.score_b > r.score_a; });
-  var sm = {};
-  ws.forEach(function(r) { var k = r.score_a + '-' + r.score_b; sm[k] = (sm[k]||0)+1; });
-  var bk = Object.keys(sm).reduce(function(a,b) { return sm[a] >= sm[b] ? a : b; });
-  var p = bk.split('-');
-  return { a: parseInt(p[0]), b: parseInt(p[1]), winner: winner };
-}
-
-async function loadEmbeddedDashboard() {
-  var eventName = document.getElementById('dash-event-select') ? document.getElementById('dash-event-select').value : '';
-  var grid = document.getElementById('dash-fights-grid');
-  var statsBar = document.getElementById('dash-stats-bar');
-  var refreshLabel = document.getElementById('dash-refresh-label');
-  if (!eventName) {
-    if (grid) grid.innerHTML = '<div style="padding:60px;text-align:center;color:var(--sub);font-size:14px;">Select an event above to load the dashboard</div>';
-    if (statsBar) statsBar.style.display = 'none';
-    if (refreshLabel) refreshLabel.style.display = 'none';
-    if (dashRefreshTimer) { clearInterval(dashRefreshTimer); dashRefreshTimer = null; }
-    return;
-  }
-  if (!dashRefreshTimer) dashRefreshTimer = setInterval(loadEmbeddedDashboard, 5000);
-  try {
-    var fightsRes = await db.from('fights_with_status')
-      .select('*, fighter_a:fighters!fights_fighter_a_id_fkey(*), fighter_b:fighters!fights_fighter_b_id_fkey(*)')
-      .eq('event_name', eventName).order('fight_date', { ascending: true });
-    if (!fightsRes.data || !fightsRes.data.length) {
-      grid.innerHTML = '<div style="padding:60px;text-align:center;color:var(--sub);">No fights found.</div>';
-      return;
-    }
-    var fights = fightsRes.data;
-    var fightIds = fights.map(function(f) { return f.id; });
-    var scRes = await db.from('scorecards').select('id,fight_id,user_id,total_a,total_b,rounds(round_number,score_a,score_b)').in('fight_id', fightIds);
-    var allCards = scRes.data || [];
-    var byFight = {};
-    fightIds.forEach(function(id) { byFight[id] = []; });
-    allCards.forEach(function(sc) { if (byFight[sc.fight_id]) byFight[sc.fight_id].push(sc); });
-    var uniqueJudges = new Set(allCards.map(function(s){return s.user_id;})).size;
-    var mostScored = fights.reduce(function(best,f) {
-      var c = (byFight[f.id]||[]).length;
-      return c > (best.c||0) ? { name: f.fighter_a.name.split(' ').pop()+' vs '+f.fighter_b.name.split(' ').pop(), c:c } : best;
-    }, {});
-    document.getElementById('dash-stat-sc').textContent = allCards.length;
-    document.getElementById('dash-stat-jd').textContent = uniqueJudges;
-    document.getElementById('dash-stat-ms').textContent = mostScored.name || '—';
-    document.getElementById('dash-stat-ft').textContent = fights.length;
-    statsBar.style.display = 'grid';
-    refreshLabel.style.display = 'block';
-
-    var html = '';
-    fights.forEach(function(fight) {
-      var cards = byFight[fight.id] || [];
-      var fAn = fight.fighter_a ? fight.fighter_a.name : 'Fighter A';
-      var fBn = fight.fighter_b ? fight.fighter_b.name : 'Fighter B';
-      var fAs = fAn.split(' ').pop().toUpperCase();
-      var fBs = fBn.split(' ').pop().toUpperCase();
-      var status = fight.auto_status || fight.status;
-      var hasData = cards.length > 0;
-      var rt = {};
-      cards.forEach(function(c) {
-        (c.rounds||[]).forEach(function(r) {
-          if (!rt[r.round_number]) rt[r.round_number] = [];
-          rt[r.round_number].push(r);
-        });
-      });
-      var dA=0,dB=0,dc=0;
-      Object.keys(rt).forEach(function(rn) { var rs=dashGetRoundScore(rt[rn]); if(rs){dA+=rs.a;dB+=rs.b;dc++;} });
-      var tot=cards.length,aW=0,bW=0;
-      cards.forEach(function(c){
-        var ca=c.total_a!=null?c.total_a:(c.rounds||[]).reduce(function(s,r){return s+r.score_a;},0);
-        var cb=c.total_b!=null?c.total_b:(c.rounds||[]).reduce(function(s,r){return s+r.score_b;},0);
-        if(ca>cb)aW++;else if(cb>ca)bW++;
-      });
-      var aPct=tot>0?Math.round(aW/tot*100):0;
-      var bPct=tot>0?Math.round(bW/tot*100):0;
-      var dPct=tot>0?Math.round((tot-aW-bW)/tot*100):0;
-      var sPill=status==='live'?'<span style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:10px;background:rgba(232,0,29,0.15);color:var(--red);border:0.5px solid rgba(232,0,29,0.4);">● LIVE</span>':status==='completed'?'<span style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:10px;background:rgba(34,197,94,0.1);color:var(--green);border:0.5px solid rgba(34,197,94,0.3);">✓ COMPLETED</span>':'<span style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:10px;background:rgba(148,148,160,0.1);color:var(--sub);">UPCOMING</span>';
-      function mkPhoto(url,side,init){return url?'<img src="'+url+'" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid var(--'+side+');" onerror="this.style.display='none'"/>':'<div style="width:48px;height:48px;border-radius:50%;background:var(--mid);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;border:2px solid var(--'+side+');color:var(--'+side+');">'+init+'</div>';}
-      var barH;
-      if(!hasData){barH='<div style="height:26px;border-radius:8px;background:var(--mid);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--sub);">No scores yet</div>';}
-      else if(aPct===0&&bPct===0){barH='<div style="height:26px;border-radius:8px;background:var(--gold);display:flex;align-items:center;justify-content:center;"><span style="font-size:11px;font-weight:700;color:white;">ALL EVEN</span></div>';}
-      else{barH='<div style="height:26px;border-radius:8px;overflow:hidden;display:flex;background:var(--mid);">';if(aPct>0)barH+='<div style="width:'+aPct+'%;background:var(--red);display:flex;align-items:center;padding-left:8px;"><span style="font-size:11px;font-weight:700;color:white;white-space:nowrap;">'+(aPct>15?fAs+' '+aPct+'%':'')+'</span></div>';if(bPct>0)barH+='<div style="width:'+bPct+'%;background:var(--blue);display:flex;align-items:center;justify-content:flex-end;padding-right:8px;"><span style="font-size:11px;font-weight:700;color:white;white-space:nowrap;">'+(bPct>15?bPct+'% '+fBs:'')+'</span></div>';barH+='</div>';}
-      var offH=fight.result_winner?'<div style="margin:0 16px 12px;background:rgba(34,197,94,0.08);border:0.5px solid rgba(34,197,94,0.3);border-radius:8px;padding:8px 12px;text-align:center;font-size:12px;font-weight:700;color:var(--green);">✓ OFFICIAL: '+fight.result_winner.toUpperCase()+(fight.result_method?' · '+fight.result_method:'')+'</div>':'';
-      var rKeys=Object.keys(rt).map(Number).sort(function(a,b){return a-b;});
-      var tH='';
-      if(rKeys.length){
-        tH+='<div style="padding:0 16px 16px;"><div style="font-size:10px;font-weight:700;color:var(--sub);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Viewers Verdict · Round by Round</div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr><th style="text-align:left;padding:5px 4px;font-size:9px;font-weight:700;color:var(--sub);border-bottom:0.5px solid var(--mid);min-width:65px;"></th>';
-        for(var ri=1;ri<=(fight.scheduled_rounds||12);ri++){tH+='<th style="padding:5px 4px;text-align:center;font-size:9px;font-weight:700;color:var(--sub);border-bottom:0.5px solid var(--mid);min-width:22px;">R'+ri+'</th>';}
-        tH+='<th style="padding:5px 8px;text-align:center;font-size:9px;font-weight:700;color:var(--sub);border-bottom:0.5px solid var(--mid);border-left:0.5px solid var(--mid);">AVG</th></tr></thead><tbody>';
-        var tA=0,tAc=0;
-        tH+='<tr><td style="font-size:11px;color:var(--sub);font-weight:600;padding:5px 4px;">'+fAs+'</td>';
-        for(var ri=1;ri<=(fight.scheduled_rounds||12);ri++){var rS=rt[ri]||[];if(rS.length){var rs=dashGetRoundScore(rS);var bg=rs.winner==='a'?'background:rgba(232,0,29,0.12);color:var(--red);':rs.winner==='even'?'background:rgba(201,168,76,0.12);color:var(--gold);':'';tH+='<td style="padding:5px 4px;text-align:center;font-size:12px;font-weight:700;border-bottom:0.5px solid rgba(42,42,47,0.4);border-radius:4px;'+bg+'">'+rs.a+'</td>';tA+=rs.a;tAc++;}else{tH+='<td style="padding:5px 4px;text-align:center;color:var(--mid);">—</td>';}}
-        tH+='<td style="padding:5px 8px;text-align:center;font-size:14px;font-weight:900;color:var(--red);border-left:0.5px solid var(--mid);">'+(tAc>0?tA:'—')+'</td></tr>';
-        var tB=0,tBc=0;
-        tH+='<tr><td style="font-size:11px;color:var(--sub);font-weight:600;padding:5px 4px;">'+fBs+'</td>';
-        for(var ri=1;ri<=(fight.scheduled_rounds||12);ri++){var rS=rt[ri]||[];if(rS.length){var rs=dashGetRoundScore(rS);var bg=rs.winner==='b'?'background:rgba(95,168,232,0.12);color:var(--blue);':rs.winner==='even'?'background:rgba(201,168,76,0.12);color:var(--gold);':'';tH+='<td style="padding:5px 4px;text-align:center;font-size:12px;font-weight:700;border-bottom:0.5px solid rgba(42,42,47,0.4);border-radius:4px;'+bg+'">'+rs.b+'</td>';tB+=rs.b;tBc++;}else{tH+='<td style="padding:5px 4px;text-align:center;color:var(--mid);">—</td>';}}
-        tH+='<td style="padding:5px 8px;text-align:center;font-size:14px;font-weight:900;color:var(--blue);border-left:0.5px solid var(--mid);">'+(tBc>0?tB:'—')+'</td></tr>';
-        tH+='</tbody></table></div></div>';
-      }
-      html+='<div style="background:var(--black);border:0.5px solid '+(hasData?'rgba(232,0,29,0.25)':'var(--mid)')+';border-radius:14px;overflow:hidden;">';
-      html+='<div style="padding:12px 16px;border-bottom:0.5px solid var(--mid);display:flex;align-items:center;justify-content:space-between;"><span style="font-size:11px;font-weight:700;color:var(--sub);letter-spacing:1px;text-transform:uppercase;">'+(fight.weight_class||'')+'</span>'+sPill+'</div>';
-      html+='<div style="display:flex;align-items:center;padding:16px;gap:10px;">';
-      html+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;">'+mkPhoto(fight.fighter_a?fight.fighter_a.avatar_url:null,'red',fAs[0])+'<div style="font-size:13px;font-weight:700;color:var(--text);">'+fAn+'</div>'+(fight.fighter_a&&fight.fighter_a.record?'<div style="font-size:11px;color:var(--sub);">'+fight.fighter_a.record+'</div>':'')+'<div style="font-size:36px;font-weight:900;color:var(--red);">'+(dc>0?dA:'—')+'</div></div>';
-      html+='<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;"><div style="font-size:12px;font-weight:700;color:var(--sub);">VS</div><div style="font-size:11px;color:var(--sub);">'+(fight.scheduled_rounds||12)+'R</div></div>';
-      html+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;">'+mkPhoto(fight.fighter_b?fight.fighter_b.avatar_url:null,'blue',fBs[0])+'<div style="font-size:13px;font-weight:700;color:var(--text);">'+fBn+'</div>'+(fight.fighter_b&&fight.fighter_b.record?'<div style="font-size:11px;color:var(--sub);">'+fight.fighter_b.record+'</div>':'')+'<div style="font-size:36px;font-weight:900;color:var(--blue);">'+(dc>0?dB:'—')+'</div></div></div>';
-      html+=offH;
-      html+='<div style="padding:0 16px 12px;"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><span style="font-size:10px;font-weight:700;color:var(--sub);letter-spacing:1px;text-transform:uppercase;">Community Consensus</span><span style="font-size:12px;color:var(--sub);">'+tot+' judge'+(tot!==1?'s':'')+'</span></div>'+barH;
-      if(hasData&&tot>0){html+='<div style="display:flex;justify-content:space-between;margin-top:6px;"><span style="font-size:13px;font-weight:700;color:var(--red);">'+fAs+' '+aPct+'%</span>'+(dPct>0?'<span style="font-size:13px;font-weight:700;color:var(--gold);">Draw '+dPct+'%</span>':'')+'<span style="font-size:13px;font-weight:700;color:var(--blue);">'+bPct+'% '+fBs+'</span></div>';}
-      html+='</div>';
-      html+=tH||'<div style="padding:20px;text-align:center;color:var(--sub);font-size:13px;">Waiting for judges to score this fight...</div>';
-      html+='</div>';
-    });
-    grid.innerHTML = html;
-  } catch(e) { console.error('Dashboard error:', e); if(grid) grid.innerHTML = '<div style="padding:40px;text-align:center;color:var(--red);">Error: '+e.message+'</div>'; }
-}
-</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -730,7 +580,7 @@ if (sessionStorage.getItem('rc_admin') === '1') {
 function showTab(tab, btn) {
   if (tab === 'broadcasters') { setTimeout(loadBroadcasters, 50); }
   if (tab === 'ads') { setTimeout(loadAds, 50); }
-  if (tab === 'dashboard') { setTimeout(loadDashEventList, 50); if (typeof dashRefreshTimer !== 'undefined' && dashRefreshTimer) { clearInterval(dashRefreshTimer); dashRefreshTimer = null; } }
+  if (tab === 'dashboard') { setTimeout(loadDashEventList, 50); if (dashRefreshTimer) { clearInterval(dashRefreshTimer); dashRefreshTimer = null; } }
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('panel-' + tab).classList.add('active');
@@ -1414,6 +1264,103 @@ async function banFromReport(userId, username, reportId) {
 }
 
 // ── INIT ──────────────────────────────────────────────────────
+
+// ── FIGHTER SEARCH ────────────────────────────────────────────
+function filterFighters() {
+  var q = (document.getElementById('fighter-search') ? document.getElementById('fighter-search').value : '').toLowerCase();
+  document.querySelectorAll('.fighter-row').forEach(function(row) {
+    row.style.display = (row.getAttribute('data-name') || '').includes(q) ? '' : 'none';
+  });
+}
+
+// ── EMBEDDED DASHBOARD ────────────────────────────────────────
+var dashRefreshTimer = null;
+
+async function loadDashEventList() {
+  var sel = document.getElementById('dash-event-select');
+  if (!sel) return;
+  var res = await db.from('fights').select('event_name').not('event_name', 'is', null).order('fight_date', { ascending: false });
+  if (!res.data) return;
+  var seen = {};
+  var opts = '<option value="">Select an event...</option>';
+  res.data.forEach(function(f) {
+    if (f.event_name && !seen[f.event_name]) { seen[f.event_name]=true; opts+='<option value="'+f.event_name+'">'+f.event_name+'</option>'; }
+  });
+  sel.innerHTML = opts;
+}
+
+function dashGetRoundScore(rs) {
+  if (!rs||!rs.length) return null;
+  var t=rs.length,aW=rs.filter(function(r){return r.score_a>r.score_b;}).length,bW=rs.filter(function(r){return r.score_b>r.score_a;}).length;
+  if(aW/t<=0.5&&bW/t<=0.5) return {a:10,b:10,winner:'even'};
+  var w=aW>bW?'a':'b',ws=rs.filter(function(r){return w==='a'?r.score_a>r.score_b:r.score_b>r.score_a;}),sm={};
+  ws.forEach(function(r){var k=r.score_a+'-'+r.score_b;sm[k]=(sm[k]||0)+1;});
+  var bk=Object.keys(sm).reduce(function(a,b){return sm[a]>=sm[b]?a:b;}),p=bk.split('-');
+  return {a:parseInt(p[0]),b:parseInt(p[1]),winner:w};
+}
+
+async function loadEmbeddedDashboard() {
+  var en=document.getElementById('dash-event-select')?document.getElementById('dash-event-select').value:'';
+  var grid=document.getElementById('dash-fights-grid'),sb=document.getElementById('dash-stats-bar'),rl=document.getElementById('dash-refresh-label');
+  if(!en){if(grid)grid.innerHTML='<div style="padding:60px;text-align:center;color:var(--sub);">Select an event above</div>';if(sb)sb.style.display='none';if(rl)rl.style.display='none';if(dashRefreshTimer){clearInterval(dashRefreshTimer);dashRefreshTimer=null;}return;}
+  if(!dashRefreshTimer) dashRefreshTimer=setInterval(loadEmbeddedDashboard,5000);
+  try {
+    var fr=await db.from('fights_with_status').select('*,fighter_a:fighters!fights_fighter_a_id_fkey(*),fighter_b:fighters!fights_fighter_b_id_fkey(*)').eq('event_name',en).order('fight_date',{ascending:true});
+    if(!fr.data||!fr.data.length){grid.innerHTML='<div style="padding:60px;text-align:center;color:var(--sub);">No fights found.</div>';return;}
+    var fights=fr.data,fids=fights.map(function(f){return f.id;});
+    var sr=await db.from('scorecards').select('id,fight_id,user_id,total_a,total_b,rounds(round_number,score_a,score_b)').in('fight_id',fids);
+    var ac=sr.data||[],bf={};
+    fids.forEach(function(id){bf[id]=[];});
+    ac.forEach(function(s){if(bf[s.fight_id])bf[s.fight_id].push(s);});
+    var uj=new Set(ac.map(function(s){return s.user_id;})).size;
+    var ms=fights.reduce(function(best,f){var c=(bf[f.id]||[]).length;return c>(best.c||0)?{name:f.fighter_a.name.split(' ').pop()+' vs '+f.fighter_b.name.split(' ').pop(),c:c}:best;},{});
+    document.getElementById('dash-stat-sc').textContent=ac.length;
+    document.getElementById('dash-stat-jd').textContent=uj;
+    document.getElementById('dash-stat-ms').textContent=ms.name||'—';
+    document.getElementById('dash-stat-ft').textContent=fights.length;
+    sb.style.display='grid';rl.style.display='block';
+    var html='';
+    fights.forEach(function(fight){
+      var cards=bf[fight.id]||[],fAn=fight.fighter_a?fight.fighter_a.name:'Fighter A',fBn=fight.fighter_b?fight.fighter_b.name:'Fighter B';
+      var fAs=fAn.split(' ').pop().toUpperCase(),fBs=fBn.split(' ').pop().toUpperCase();
+      var status=fight.auto_status||fight.status,hd=cards.length>0,rt={};
+      cards.forEach(function(c){(c.rounds||[]).forEach(function(r){if(!rt[r.round_number])rt[r.round_number]=[];rt[r.round_number].push(r);});});
+      var dA=0,dB=0,dc=0;
+      Object.keys(rt).forEach(function(rn){var rs=dashGetRoundScore(rt[rn]);if(rs){dA+=rs.a;dB+=rs.b;dc++;}});
+      var tot=cards.length,aW=0,bW=0;
+      cards.forEach(function(c){var ca=c.total_a!=null?c.total_a:(c.rounds||[]).reduce(function(s,r){return s+r.score_a;},0);var cb=c.total_b!=null?c.total_b:(c.rounds||[]).reduce(function(s,r){return s+r.score_b;},0);if(ca>cb)aW++;else if(cb>ca)bW++;});
+      var ap=tot>0?Math.round(aW/tot*100):0,bp=tot>0?Math.round(bW/tot*100):0,dp=tot>0?Math.round((tot-aW-bW)/tot*100):0;
+      var sp=status==='live'?'<span style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:10px;background:rgba(232,0,29,0.15);color:var(--red);border:0.5px solid rgba(232,0,29,0.4);">● LIVE</span>':status==='completed'?'<span style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:10px;background:rgba(34,197,94,0.1);color:var(--green);border:0.5px solid rgba(34,197,94,0.3);">✓ COMPLETED</span>':'<span style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:10px;background:rgba(148,148,160,0.1);color:var(--sub);">UPCOMING</span>';
+      function ph(url,side,i){return url?'<img src="'+url+'" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid var(--'+side+');" onerror="this.style.display=\'none\'"/>':'<div style="width:48px;height:48px;border-radius:50%;background:var(--mid);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;border:2px solid var(--'+side+');color:var(--'+side+');">'+i+'</div>';}
+      var bh=!hd?'<div style="height:26px;border-radius:8px;background:var(--mid);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--sub);">No scores yet</div>':ap===0&&bp===0?'<div style="height:26px;border-radius:8px;background:var(--gold);display:flex;align-items:center;justify-content:center;"><span style="font-size:11px;font-weight:700;color:white;">ALL EVEN</span></div>':'<div style="height:26px;border-radius:8px;overflow:hidden;display:flex;background:var(--mid);">'+(ap>0?'<div style="width:'+ap+'%;background:var(--red);display:flex;align-items:center;padding-left:8px;"><span style="font-size:11px;font-weight:700;color:white;white-space:nowrap;">'+(ap>15?fAs+' '+ap+'%':'')+'</span></div>':'')+(bp>0?'<div style="width:'+bp+'%;background:var(--blue);display:flex;align-items:center;justify-content:flex-end;padding-right:8px;"><span style="font-size:11px;font-weight:700;color:white;white-space:nowrap;">'+(bp>15?bp+'% '+fBs:'')+'</span></div>':'')+'</div>';
+      var oh=fight.result_winner?'<div style="margin:0 16px 12px;background:rgba(34,197,94,0.08);border:0.5px solid rgba(34,197,94,0.3);border-radius:8px;padding:8px 12px;text-align:center;font-size:12px;font-weight:700;color:var(--green);">✓ OFFICIAL: '+fight.result_winner.toUpperCase()+(fight.result_method?' · '+fight.result_method:'')+'</div>':'';
+      var rk=Object.keys(rt).map(Number).sort(function(a,b){return a-b;}),th='';
+      if(rk.length){
+        th='<div style="padding:0 16px 16px;"><div style="font-size:10px;font-weight:700;color:var(--sub);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Viewers Verdict</div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr><th style="text-align:left;padding:5px 4px;font-size:9px;color:var(--sub);border-bottom:0.5px solid var(--mid);min-width:65px;"></th>';
+        for(var ri=1;ri<=(fight.scheduled_rounds||12);ri++){th+='<th style="padding:5px 4px;text-align:center;font-size:9px;color:var(--sub);border-bottom:0.5px solid var(--mid);min-width:22px;">R'+ri+'</th>';}
+        th+='<th style="padding:5px 8px;font-size:9px;color:var(--sub);border-bottom:0.5px solid var(--mid);border-left:0.5px solid var(--mid);text-align:center;">AVG</th></tr></thead><tbody>';
+        var tA=0,tAc=0;
+        th+='<tr><td style="font-size:11px;color:var(--sub);font-weight:600;padding:5px 4px;">'+fAs+'</td>';
+        for(var ri=1;ri<=(fight.scheduled_rounds||12);ri++){var rS=rt[ri]||[];if(rS.length){var rs=dashGetRoundScore(rS);var bg=rs.winner==='a'?'background:rgba(232,0,29,0.12);color:var(--red);':rs.winner==='even'?'background:rgba(201,168,76,0.12);color:var(--gold);':'';th+='<td style="padding:5px 4px;text-align:center;font-size:12px;font-weight:700;border-bottom:0.5px solid rgba(42,42,47,0.4);border-radius:4px;'+bg+'">'+rs.a+'</td>';tA+=rs.a;tAc++;}else{th+='<td style="padding:5px 4px;text-align:center;color:var(--mid);">—</td>';}}
+        th+='<td style="padding:5px 8px;text-align:center;font-size:14px;font-weight:900;color:var(--red);border-left:0.5px solid var(--mid);">'+(tAc>0?tA:'—')+'</td></tr>';
+        var tB=0,tBc=0;
+        th+='<tr><td style="font-size:11px;color:var(--sub);font-weight:600;padding:5px 4px;">'+fBs+'</td>';
+        for(var ri=1;ri<=(fight.scheduled_rounds||12);ri++){var rS=rt[ri]||[];if(rS.length){var rs=dashGetRoundScore(rS);var bg=rs.winner==='b'?'background:rgba(95,168,232,0.12);color:var(--blue);':rs.winner==='even'?'background:rgba(201,168,76,0.12);color:var(--gold);':'';th+='<td style="padding:5px 4px;text-align:center;font-size:12px;font-weight:700;border-bottom:0.5px solid rgba(42,42,47,0.4);border-radius:4px;'+bg+'">'+rs.b+'</td>';tB+=rs.b;tBc++;}else{th+='<td style="padding:5px 4px;text-align:center;color:var(--mid);">—</td>';}}
+        th+='<td style="padding:5px 8px;text-align:center;font-size:14px;font-weight:900;color:var(--blue);border-left:0.5px solid var(--mid);">'+(tBc>0?tB:'—')+'</td></tr>';
+        th+='</tbody></table></div></div>';
+      }
+      html+='<div style="background:var(--black);border:0.5px solid '+(hd?'rgba(232,0,29,0.25)':'var(--mid)')+';border-radius:14px;overflow:hidden;">';
+      html+='<div style="padding:12px 16px;border-bottom:0.5px solid var(--mid);display:flex;align-items:center;justify-content:space-between;"><span style="font-size:11px;font-weight:700;color:var(--sub);letter-spacing:1px;text-transform:uppercase;">'+(fight.weight_class||'')+'</span>'+sp+'</div>';
+      html+='<div style="display:flex;align-items:center;padding:16px;gap:10px;"><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;">'+ph(fight.fighter_a?fight.fighter_a.avatar_url:null,'red',fAs[0])+'<div style="font-size:13px;font-weight:700;color:var(--text);">'+fAn+'</div>'+(fight.fighter_a&&fight.fighter_a.record?'<div style="font-size:11px;color:var(--sub);">'+fight.fighter_a.record+'</div>':'')+'<div style="font-size:36px;font-weight:900;color:var(--red);">'+(dc>0?dA:'—')+'</div></div><div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;"><div style="font-size:12px;font-weight:700;color:var(--sub);">VS</div><div style="font-size:11px;color:var(--sub);">'+(fight.scheduled_rounds||12)+'R</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;">'+ph(fight.fighter_b?fight.fighter_b.avatar_url:null,'blue',fBs[0])+'<div style="font-size:13px;font-weight:700;color:var(--text);">'+fBn+'</div>'+(fight.fighter_b&&fight.fighter_b.record?'<div style="font-size:11px;color:var(--sub);">'+fight.fighter_b.record+'</div>':'')+'<div style="font-size:36px;font-weight:900;color:var(--blue);">'+(dc>0?dB:'—')+'</div></div></div>';
+      html+=oh;
+      html+='<div style="padding:0 16px 12px;"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><span style="font-size:10px;font-weight:700;color:var(--sub);letter-spacing:1px;text-transform:uppercase;">Community Consensus</span><span style="font-size:12px;color:var(--sub);">'+tot+' judge'+(tot!==1?'s':'')+'</span></div>'+bh+(hd&&tot>0?'<div style="display:flex;justify-content:space-between;margin-top:6px;"><span style="font-size:13px;font-weight:700;color:var(--red);">'+fAs+' '+ap+'%</span>'+(dp>0?'<span style="font-size:13px;font-weight:700;color:var(--gold);">Draw '+dp+'%</span>':'')+'<span style="font-size:13px;font-weight:700;color:var(--blue);">'+bp+'% '+fBs+'</span></div>':'')+'</div>';
+      html+=th||'<div style="padding:20px;text-align:center;color:var(--sub);font-size:13px;">Waiting for judges to score this fight...</div>';
+      html+='</div>';
+    });
+    grid.innerHTML=html;
+  } catch(e){console.error('Dashboard error:',e);if(grid)grid.innerHTML='<div style="padding:40px;text-align:center;color:var(--red);">Error: '+e.message+'</div>';}
+}
+
 if (sessionStorage.getItem('rc_admin') === '1') init();
 </script>
 
@@ -1507,10 +1454,8 @@ if (sessionStorage.getItem('rc_admin') === '1') init();
   <div style="background:#1A1A1E;border:0.5px solid #2A2A2F;border-radius:16px;padding:32px;max-width:560px;width:100%;max-height:80vh;overflow-y:auto;">
     <div style="font-size:20px;font-weight:900;color:var(--text);margin-bottom:4px;">How Scores Are Calculated</div>
     <div style="font-size:13px;color:var(--sub);margin-bottom:24px;">RoundCard uses real fan scorecards to determine community verdicts.</div>
-    <div style="margin-bottom:16px;"><div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Who Scored</div><p style="font-size:13px;color:var(--sub);line-height:1.7;">Every score comes from a <strong style="color:var(--text)">real registered user</strong> scoring live in RoundCard using the <strong style="color:var(--text)">10-point must system</strong>.</p></div>
     <div style="margin-bottom:16px;"><div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Who Won the Round</div><p style="font-size:13px;color:var(--sub);line-height:1.7;">Strictly more than 50% of judges must have a fighter winning. Ties and 50/50 splits default to <strong style="color:var(--text)">10-10</strong>.</p></div>
-    <div style="margin-bottom:16px;"><div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">By What Score</div><p style="font-size:13px;color:var(--sub);line-height:1.7;">The most commonly submitted score among the majority winner's judges. Naturally reflects knockdowns (10-8) and deductions.</p></div>
-    <div style="margin-bottom:16px;"><div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Why Numbers May Differ</div><p style="font-size:13px;color:var(--sub);line-height:1.7;"><strong style="color:var(--text)">Community Consensus</strong> — % with each fighter winning overall.<br/><strong style="color:var(--text)">Viewers Verdict</strong> — built round by round from majority winners. Both valid, can differ.</p></div>
+    <div style="margin-bottom:16px;"><div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Why Numbers May Differ</div><p style="font-size:13px;color:var(--sub);line-height:1.7;"><strong style="color:var(--text)">Community Consensus</strong> — % with each fighter winning overall.<br/><strong style="color:var(--text)">Viewers Verdict</strong> — built round by round from majority winners.</p></div>
     <button onclick="document.getElementById('dashMethodModal').style.display='none'" style="width:100%;background:var(--red);border:none;border-radius:8px;padding:12px;color:white;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">CLOSE</button>
   </div>
 </div>
