@@ -842,6 +842,7 @@ async function loadFights() {
           <input id="seed-split-b-${f.id}" type="number" value="${f.seed_split_b || 0}" min="0" max="100" style="background:var(--black);border:0.5px solid #3A3A3F;border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;width:60px;outline:none;"/>
         </div>
         <button class="btn btn-mid btn-sm" onclick="saveSeedData('${f.id}', this)">SAVE SEED</button>
+        <button class="btn btn-sm" style="background:${f.is_classic ? 'rgba(201,168,76,0.15)' : 'var(--mid)'};color:${f.is_classic ? 'var(--gold)' : 'var(--sub)'};border:0.5px solid ${f.is_classic ? 'rgba(201,168,76,0.4)' : 'transparent'};" onclick="toggleClassic('${f.id}', ${f.is_classic || false})">${f.is_classic ? '⭐ Classic' : '⭐ Mark Classic'}</button>
       </div>
     </div>`;
 
@@ -903,6 +904,13 @@ function toggleEventGroup(idx) {
   const toggle = document.getElementById('toggle-' + idx);
   body.classList.toggle('open');
   toggle.classList.toggle('open');
+}
+
+async function toggleClassic(id, current) {
+  var newVal = !current;
+  var res = await db.from('fights').update({ is_classic: newVal }).eq('id', id);
+  if (res.error) { alert('Error: ' + res.error.message); return; }
+  loadFights();
 }
 
 async function saveSeedData(id, btn) {
